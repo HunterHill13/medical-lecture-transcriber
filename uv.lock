@@ -180,6 +180,11 @@ dev = [
     { name = "pytest" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "pymupdf", specifier = ">=1.24.0,<2.0.0" },
@@ -189,6 +194,9 @@ requires-dist = [
     { name = "rapidocr-onnxruntime", specifier = ">=1.3.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0.0,<9.0.0" }]
 
 [[package]]
 name = "numpy"

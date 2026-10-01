@@ -25,7 +25,7 @@ jobs:
         enable-cache: true
 
     - name: Install dependencies
-      run: uv sync
+      run: uv sync --all-extras
 
     - name: Compile check
       run: uv run python -m compileall scripts tests
