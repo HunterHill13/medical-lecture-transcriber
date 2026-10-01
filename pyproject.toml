@@ -1,0 +1,32 @@
+[project]
+name = "medical-lecture-transcriber"
+version = "5.1.0"
+description = "Publication-grade medical study guide and lecture transcription workflow"
+readme = "SKILL.md"
+requires-python = ">=3.11"
+dependencies = [
+    "python-pptx>=1.0.0,<2.0.0",
+    "pymupdf>=1.24.0,<2.0.0",
+    "python-docx>=1.1.0,<2.0.0",
+    "rapidocr-onnxruntime>=1.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0,<9.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scripts"]
+exclude = [
+    "**/__pycache__",
+    "*.pyc",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]

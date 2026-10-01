@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments & Virtualenvs
+.venv/
+env/
+venv/
+ENV/
+.env
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts & distributions
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.zip
+
+# Pipeline artifacts & intermediate files
+scratch/
+slide_images/
+chunks/
+*.docx
+raw_slides.json
+translated_slides.json
+alignment_diagnostic_*.json
+transcript_*.txt
+transcripts/
+
+# OS specific files
+.DS_Store
+Thumbs.db
