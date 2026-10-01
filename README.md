@@ -1,5 +1,7 @@
 # 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.1.0)
 
+[🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
+
 [![Tests](https://img.shields.io/badge/Tests-103%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://python.org)
 [![Version](https://img.shields.io/badge/Version-5.1.0-orange?style=for-the-badge)](scripts/version.py)
