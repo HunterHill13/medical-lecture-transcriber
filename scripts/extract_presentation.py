@@ -123,6 +123,44 @@ def render_pptx_slides_to_images(pptx_path: str, img_dir: str) -> bool:
 
     return False
 
+TABLE_INDICATOR_KEYWORDS = {
+    "table", "classification", "causes", "cause", "differential", "diagnosis",
+    "criteria", "staging", "grading", "summary", "features", "comparison",
+    "overview", "جدول", "طبقه‌بندی", "تشخیص", "افتراقی", "علل", "معیارها"
+}
+
+def detect_image_table(title: str, text_lines: list, ocr_lines: list, has_images: bool) -> bool:
+    """
+    Multi-layered detector for image-based tables (screenshots of textbook tables/classifications).
+    Combines indicator keywords, enumeration patterns (I., II., A., B., 1., 2.), and OCR structural density.
+    """
+    if not has_images and not ocr_lines:
+        return False
+    combined_text = (str(title) + " " + " ".join(text_lines) + " " + " ".join(ocr_lines)).lower()
+    
+    # 1. Keyword check in title or text
+    has_keyword = any(kw in combined_text for kw in TABLE_INDICATOR_KEYWORDS)
+    
+    # 2. Structural enumeration pattern (I., II., III., A., B., C., 1., 2., bullets)
+    enum_pattern_count = 0
+    for l in ocr_lines:
+        ls = l.strip()
+        if any(ls.startswith(prefix) for prefix in ("I.", "II.", "III.", "IV.", "V.", "VI.", "A.", "B.", "C.", "D.", "E.", "1.", "2.", "3.", "4.", "5.", "•", "-", "—")):
+            enum_pattern_count += 1
+            
+    # 3. Delimiters or multiple aligned rows
+    has_delimiters = any("|" in l or "\t" in l for l in ocr_lines)
+    
+    # If keyword present and OCR shows structured content (>= 3 lines or enum pattern)
+    if has_keyword and (len(ocr_lines) >= 3 or enum_pattern_count >= 2):
+        return True
+        
+    # If strong structural pattern in OCR regardless of title
+    if enum_pattern_count >= 3 or has_delimiters or len(ocr_lines) >= 6:
+        return True
+        
+    return False
+
 def extract_pptx(pptx_path, img_dir=None):
     from pptx import Presentation
     from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -208,9 +246,14 @@ def extract_pptx(pptx_path, img_dir=None):
         if candidate_img and (has_visuals or total_words < 5 or is_text_empty):
             ocr_lines, ocr_conf, ocr_confident, ocr_uncertain = run_ocr_on_image(candidate_img)
 
+        has_image_table = detect_image_table(title, text_lines, ocr_lines, has_images)
+        if has_image_table:
+            has_tables = True
+            is_image_heavy = False
+
         has_image_text = bool(ocr_confident and len(ocr_lines) > 0)
-        is_pure_visual = bool(is_text_empty and not has_image_text and has_visual_content and not ocr_uncertain)
-        needs_vision = bool(has_visual_content and total_chars < 50) or is_text_empty or has_charts or has_smartart or ocr_uncertain
+        is_pure_visual = bool(is_text_empty and not has_image_text and has_visual_content and not ocr_uncertain and not has_image_table)
+        needs_vision = bool(has_visual_content and total_chars < 50) or is_text_empty or has_charts or has_smartart or ocr_uncertain or has_image_table
             
         slide_meta = {
             "slide_number": slide_num,
@@ -220,20 +263,20 @@ def extract_pptx(pptx_path, img_dir=None):
             "has_images": has_images,
             "full_slide_rendered": full_rendered,
             "has_tables": has_tables,
-            "has_image_table": False,
+            "has_image_table": has_image_table,
             "has_image_text": has_image_text,
             "is_image_text_bearing": has_image_text,
             "is_pure_visual": is_pure_visual,
             "has_charts": has_charts,
             "has_smartart": has_smartart,
             "is_text_empty": is_text_empty,
-            "is_image_only": (is_text_empty and has_visual_content and not has_image_text and not ocr_uncertain),
+            "is_image_only": (is_text_empty and has_visual_content and not has_image_text and not ocr_uncertain and not has_image_table),
             "is_image_heavy": is_image_heavy,
             "needs_vision_inspection": needs_vision,
             "ocr_confidence": ocr_conf,
             "ocr_uncertain": ocr_uncertain,
             "needs_student_review": ocr_uncertain,
-            "ocr_hint": "⚠️ Visual text detected via OCR (diagram/micrograph labels). Agent MUST translate labels." if has_image_text else ("⚠️ Pure visual slide without text." if is_pure_visual else ""),
+            "ocr_hint": "⚠️ Visual table detected via OCR. Agent MUST produce complete table_data." if has_image_table else ("⚠️ Visual text detected via OCR (diagram/micrograph labels). Agent MUST translate labels." if has_image_text else ("⚠️ Pure visual slide without text." if is_pure_visual else "")),
             "image_extraction_error": image_extraction_error
         }
         if img_dir and not full_rendered:
@@ -324,16 +367,22 @@ def extract_pdf(pdf_path, img_dir=None):
                     except Exception:
                         pass
 
-        has_image_text = bool(ocr_confident and len(ocr_lines) > 0)
-        is_pure_visual = bool(len(raw_lines) == 0 and not has_image_text and has_visual_content and not ocr_uncertain)
-        needs_vision = bool(has_visual_content and total_chars < 50) or is_scanned or has_image_text or ocr_uncertain
-        
         title = raw_lines[0] if raw_lines else (ocr_lines[0] if ocr_lines else f"Slide {slide_num}")
         # Filter out plain numbers or headers
         if len(raw_lines) > 1 and (len(title) <= 2 or title.isdigit()):
             title = raw_lines[1]
         elif len(raw_lines) == 0 and len(ocr_lines) > 1 and (len(title) <= 2 or title.isdigit()):
             title = ocr_lines[1]
+
+        if not has_image_table and has_images:
+            has_image_table = detect_image_table(title, raw_lines, ocr_lines, has_images)
+            if has_image_table:
+                has_tables = True
+                is_image_heavy = False
+
+        has_image_text = bool(ocr_confident and len(ocr_lines) > 0)
+        is_pure_visual = bool(len(raw_lines) == 0 and not has_image_text and has_visual_content and not ocr_uncertain and not has_image_table)
+        needs_vision = bool(has_visual_content and total_chars < 50) or is_scanned or has_image_text or ocr_uncertain or has_image_table
                 
         slides_data.append({
             "slide_number": slide_num,
@@ -346,7 +395,7 @@ def extract_pdf(pdf_path, img_dir=None):
             "has_image_text": has_image_text,
             "is_image_text_bearing": has_image_text,
             "is_pure_visual": is_pure_visual,
-            "is_image_only": (len(raw_lines) == 0 and has_visual_content and not has_image_text and not ocr_uncertain),
+            "is_image_only": (len(raw_lines) == 0 and has_visual_content and not has_image_text and not ocr_uncertain and not has_image_table),
             "is_image_heavy": is_image_heavy,
             "is_scanned": is_scanned,
             "needs_vision_inspection": needs_vision,

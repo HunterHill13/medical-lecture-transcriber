@@ -1,11 +1,11 @@
-# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۱.۰)
+# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۲.۰)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=تست‌های%20خودکار%20CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/تست‌ها-۱۰۳%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/تست‌ها-۱۰۷%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/پایتون-۳.۱۱%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/نسخه-۵.۱.۰-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/نسخه-۵.۲.۰-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/مجوز-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/گوگل%20آنتی‌گرویتی-سازگار-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -30,17 +30,22 @@
 * افعال و کلمات روتین نگارش انگلیسی نظیر `cannot`، `provide`، `replace`، `under` از مخرج کسر ارزیابی حذف می‌شوند.
 * تمرکز ارزیابی تنها روی مفاهیم تخصصی بالینی، فرمول‌ها، نمادهای بیوشیمیایی (`Ca²⁺`، `HCO₃⁻`) و مخفف‌های پزشکی است تا ترجمه فارسی بتواند بدون نیاز به واژه‌های زائد انگلیسی، با پایبندی ۱۰۰٪ تایید شود.
 
-### ۴. ☁️ پروتکل رونویسی صوتی چندوجهی جمنای (Gemini Multimodal STT)
+### ۴. 📊 گیت ممیزی تمامیت و عدم حذف ردیف‌های جداول (`TABLE_COMPLETENESS_GATE`)
+* الزام قطعی به ترجمه سطر به سطر و اتمیک ۱۰۰٪ ردیف‌ها و سرفصل‌های فرعی در جداول رفرنس درسی (نظیر جدول هاریسون).
+* شناسایی هوشمند اسکرین‌شات‌ها و تصاویر حاوی جدول (`has_image_table: true`) و ممانعت از معافیت اسلاید از ارزیابی کامل.
+* گنجاندن متون کلیه خانه‌های جدول در موتور یادآوری مفاهیم و صدور خطای سخت مسدودکننده (`INCOMPLETE_TABLE_TRANSCRIPTION` و `MISSING_TABLE_DATA`) در صورت خلاصه کردن یا جا انداختن ردیف‌های جدول (نظیر مسمومیت با آلومینیوم در اسلاید ۴۵).
+
+### ۵. ☁️ پروتکل رونویسی صوتی چندوجهی جمنای (Gemini Multimodal STT)
 * بهره‌گیری مستقیم از قابلیت چندوجهی Google Gemini برای درک زبان گفتاری و تبدیل گفتار به نوشتار.
 * ممنوعیت اکید دانلود مدل‌های سنگین لوکال ویسپر (Whisper) و بسته‌های حجیم CUDA؛ حفظ گیگابایت‌ها فضای دیسک و حافظه با دقت بی‌نظیر در واژگان تخصصی فارسی-انگلیسی پزشکی.
 
-### ۵. 👁️ موتور OCR آگاه به محتوای بصری اسلایدها
+### ۶. 👁️ موتور OCR آگاه به محتوای بصری اسلایدها
 * فعال‌سازی هوشمند OCR برای اسلایدهایی که دارای تصویر، نمودار، جدول یا SmartArt هستند، حتی اگر اسلاید متن دیجیتال زیادی داشته باشد.
 * پالایش خطاهای OCR با آستانه اطمینان آماری (`confidence >= 0.60`).
 * ثبت بنر هشدار در سند Word در صورت بروز هرگونه خطا در استخراج تصاویر اسلایدها.
 
-### ۶. 🧪 مجموعه آزمون‌های خودکار ۱۰۳ تستی
-* شامل آزمون‌های جامع یکپارچگی، عدم جابه‌جایی صفحات اسلایدها، خط زمانی صوتی و صحت ساختار داده‌ها.
+### ۷. 🧪 مجموعه آزمون‌های خودکار ۱۰۷ تستی
+* شامل آزمون‌های جامع یکپارچگی، عدم جابه‌جایی صفحات اسلایدها، صحت بازتولید ردیف‌های جداول، خط زمانی صوتی و ساختار داده‌ها.
 
 ---
 

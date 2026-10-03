@@ -1631,6 +1631,111 @@ def test_valid_concise_medical_parentheses_pass_cleanly():
     assert len(clause_violations) == 0, f"Expected 0 PARENTHETICAL_CLAUSE_VIOLATION for valid medical terms, got: {clause_violations}"
 
 
+def test_slide_45_table_omission_triggers_incomplete_table_transcription():
+    """
+    Simulation of Slide 45 Bug (Harrison Table: Classification of Causes of Hypercalcemia).
+    Verifies that when a slide contains diagnostic table rows (e.g. Aluminum intoxication,
+    Lithium therapy, Sarcoidosis, Multiple myeloma) and key clinical rows are omitted,
+    the verifier raises an INCOMPLETE_TABLE_TRANSCRIPTION error.
+    """
+    from verify_slide_alignment import check_slide_pair
+
+    raw_slide_45 = {
+        "slide_number": 45,
+        "title_raw": "Classification of Causes of Hypercalcemia",
+        "text_lines": ["Classification of Causes of Hypercalcemia"],
+        "ocr_text_lines": [
+            "I. Parathyroid-related: Primary hyperparathyroidism, Lithium therapy, Familial hypocalciuric hypercalcemia",
+            "II. Malignancy-related: Solid tumor metastases breast, lung, kidney; Hematologic multiple myeloma, lymphoma, leukemia",
+            "III. Vitamin D-related: Vitamin D intoxication, 1,25(OH)2D sarcoidosis",
+            "IV. Associated with Renal Failure: Severe secondary hyperparathyroidism, Aluminum intoxication, Milk-alkali syndrome"
+        ],
+        "has_images": True,
+        "has_tables": True,
+        "has_image_table": True,
+        "has_image_text": True
+    }
+
+    # Deficient translation that omitted the renal failure rows including Aluminum intoxication
+    trans_deficient_45 = {
+        "slide_number": 45,
+        "title_fa": "طبقه‌بندی علل هایپرکلسمی",
+        "title_en": "Classification of Causes of Hypercalcemia",
+        "bullets": [],
+        "table_data": {
+            "headers": ["دسته علل", "اتیولوژی‌های اختصاصی"],
+            "rows": [
+                {"cols": ["وابسته به پاراتیروئید", "هایپرپاراتیروئیدیسم اولیه و درمان با لیتیوم"]},
+                {"cols": ["وابسته به بدخیمی", "تومورهای توپر پستان، ریه، کلیه"]}
+                # Renal failure / Aluminum intoxication omitted!
+            ]
+        }
+    }
+
+    issues = check_slide_pair(raw_slide_45, trans_deficient_45)
+    incomplete_errs = [i for i in issues if i.get("type") == "INCOMPLETE_TABLE_TRANSCRIPTION"]
+    assert len(incomplete_errs) >= 1, f"Expected INCOMPLETE_TABLE_TRANSCRIPTION error for omitted table rows, got: {issues}"
+    assert incomplete_errs[0]["severity"] == "error"
+    assert "Aluminum" in str(incomplete_errs[0].get("message")) or "aluminum" in str(incomplete_errs[0].get("message")).lower() or incomplete_errs[0]["type"] == "INCOMPLETE_TABLE_TRANSCRIPTION"
+
+
+def test_slide_45_complete_table_transcription_passes():
+    """
+    Verifies that when all subcategories from Harrison Table 45 (including Aluminum intoxication,
+    Lithium therapy, Sarcoidosis, Multiple myeloma) are fully translated in table_data,
+    the slide passes with 0 errors.
+    """
+    from verify_slide_alignment import check_slide_pair
+
+    raw_slide_45 = {
+        "slide_number": 45,
+        "title_raw": "Classification of Causes of Hypercalcemia",
+        "text_lines": ["Classification of Causes of Hypercalcemia"],
+        "ocr_text_lines": [
+            "I. Parathyroid-related: Primary hyperparathyroidism, Lithium therapy, Familial hypocalciuric hypercalcemia",
+            "II. Malignancy-related: Solid tumor metastases breast, lung, kidney; Hematologic multiple myeloma, lymphoma, leukemia",
+            "III. Vitamin D-related: Vitamin D intoxication, 1,25(OH)2D sarcoidosis",
+            "IV. Associated with Renal Failure: Severe secondary hyperparathyroidism, Aluminum intoxication, Milk-alkali syndrome"
+        ],
+        "has_images": True,
+        "has_tables": True,
+        "has_image_table": True,
+        "has_image_text": True
+    }
+
+    trans_complete_45 = {
+        "slide_number": 45,
+        "title_fa": "طبقه‌بندی علل هایپرکلسمی",
+        "title_en": "Classification of Causes of Hypercalcemia",
+        "bullets": [],
+        "table_data": {
+            "headers": ["دسته‌بندی اصلی", "علل و بیماری‌های اختصاصی"],
+            "rows": [
+                {"merged": True, "text": "I. علل وابسته به پاراتیروئید (Parathyroid-related)"},
+                {"cols": ["هایپرپاراتیروئیدیسم اولیه", "آدنوم منفرد، هایپرپلازی و کارسینوما"]},
+                {"cols": ["درمان با لیتیوم", "کاهش حساسیت گیرنده‌های کلسیم"]},
+                {"cols": ["هایپرکلسمی هایپوکلسیمیک فامیلیال", "جهش در گیرنده سنجش کلسیم (FHH)"]},
+                {"merged": True, "text": "II. علل وابسته به بدخیمی (Malignancy-related)"},
+                {"cols": ["متاستاز تومورهای توپر به استخوان", "سرطان پستان (Breast cancer) و ریه"]},
+                {"cols": ["ترشح هورمونی پپتید وابسته به PTH", "تومورهای بدخیم ریه و کلیه (Kidney)"]},
+                {"cols": ["بدخیمی‌های خونی", "مولتیپل میلوما (Multiple myeloma)، لنفوم و لوسمی"]},
+                {"merged": True, "text": "III. علل مرتبط با ویتامین دی (Vitamin D-related)"},
+                {"cols": ["مسمومیت با ویتامین D", "مصرف بیش از حد و هایپرویتامینوز"]},
+                {"cols": ["افزایش سنتز متابولیت فعال", "بیماری سارکوئیدوز (Sarcoidosis) و گرانولوماتوز"]},
+                {"merged": True, "text": "IV. همراه با نارسایی کلیوی (Associated with Renal Failure)"},
+                {"cols": ["هایپرپاراتیروئیدیسم ثانویه شدید", "نارسایی مزمن کلیوی"]},
+                {"cols": ["مسمومیت با آلومینیوم", "تجویز آلومینیوم در بیماران دیالیزی (Aluminum intoxication)"]},
+                {"cols": ["سندرم شیر-قلیا", "مصرف همزمان مقادیر زیاد کلسیم و آنتی‌اسیدهای قابل جذب"]}
+            ]
+        }
+    }
+
+    issues = check_slide_pair(raw_slide_45, trans_complete_45)
+    errors = [i for i in issues if i.get("severity") == "error"]
+    assert len(errors) == 0, f"Expected 0 errors for complete slide 45 table, got: {errors}"
+
+
+
 
 
 

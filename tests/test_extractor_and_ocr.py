@@ -759,6 +759,34 @@ def test_image_extraction_error_verification_warning():
     assert any(i.get("type") == "IMAGE_EXTRACTION_FAILED" and i.get("severity") == "warning" for i in issues)
 
 
+def test_detect_image_table_recognizes_harrison_table_screenshot():
+    """Verifies that detect_image_table detects table screenshots with classification keywords and enumeration."""
+    from extract_presentation import detect_image_table
+
+    title = "Classification of Causes of Hypercalcemia"
+    text_lines = ["Classification of Causes of Hypercalcemia"]
+    ocr_lines = [
+        "I. Parathyroid-related: Primary hyperparathyroidism, Lithium therapy",
+        "II. Malignancy-related: Solid tumor metastases breast, lung, kidney",
+        "III. Vitamin D-related: Vitamin D intoxication, Sarcoidosis",
+        "IV. Associated with Renal Failure: Severe secondary hyperparathyroidism, Aluminum intoxication"
+    ]
+    is_table = detect_image_table(title, text_lines, ocr_lines, has_images=True)
+    assert is_table is True, "Expected detect_image_table to identify Harrison classification screenshot as image table"
+
+
+def test_detect_image_table_negative_for_plain_diagram():
+    """Verifies that detect_image_table does not misclassify simple anatomical diagrams as tables."""
+    from extract_presentation import detect_image_table
+
+    title = "Thyroid Anatomy"
+    text_lines = ["Thyroid Anatomy"]
+    ocr_lines = ["Left lobe", "Right lobe", "Isthmus"]
+    is_table = detect_image_table(title, text_lines, ocr_lines, has_images=True)
+    assert is_table is False, "Expected plain anatomical diagram not to be flagged as image table"
+
+
+
 
 
 

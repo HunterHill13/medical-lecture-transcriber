@@ -1,16 +1,17 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.1.0): enforces Anti-Clause Parentheses Gate
-  (PARENTHETICAL_CLAUSE_VIOLATION strictly restricts parenthetical English to <= 4 words of concise proper/drug names and blocks full clauses),
+  Publication-grade medical study guide and lecture transcription workflow (v5.2.0): enforces Table Completeness Gate
+  (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table row preservation without summarization),
+  Anti-Clause Parentheses Gate (PARENTHETICAL_CLAUSE_VIOLATION strictly restricts parenthetical English to <= 4 words of concise proper/drug names and blocks full clauses),
   Substantive Medical Concept Denominator Filtering (filters routine English prose verbs and fillers from recall denominator),
   Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads),
   Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (248 non-generic concepts + phrases),
-  Visual-Aware OCR Triggering, Automated 103-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 107-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.1.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.2.0)
 
 ## Overview
 
@@ -564,6 +565,14 @@ uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations 
 
 7. **گیت ممیزی نفوذ داروها و مداخلات در زبان فارسی (Persian Pharma Intrusion Audit):**
    - برای جلوگیری از تزریق رژیم‌های دارویی یا اقدامات درمانی تألیفی مدل به کادر اسلاید (Track 2) در متن فارسی، سیستم واژگان تخصصی فارماکولوژی بالینی فارسی (`PERSIAN_PHARMA_INTERVENTIONS` نظیر متیمازول، آتورواستاتین، وارفارین، جراحی، تیروئیدکتومی و...) را در هر دو فرم استاندارد و نرمال‌شده املایی پایش می‌کند. در صورتی که دارویی در ترجمه فارسی کادر اسلاید ذکر شود که اصل آن در اسلاید خام منبع وجود نداشته است، خطای قطعی `UNSUPPORTED_SLIDE_BOX_CONTENT` صادر شده و مدل ملزم می‌شود آن را به بخش شرح رفرنس (`ref_note`) منتقل کند.
+
+8. **پروتکل استخراج جامع و خط‌به‌خط تمامی ردیف‌ها و سلول‌های جدول (Exhaustive Table Cell-by-Cell & Line-by-Line Preservation Protocol):**
+   - **قانون جامعیت جداول تشخیصی و اتیولوژیک (Zero-Omission Rule):** در جداول رفرنس درسی پزشکی (نظیر جدول طبقه‌بندی علل هایپرکلسمی هاریسون، کرایتریای تشخیصی دیابت رابینز، یا مراحل بالینی تومورها)، هرگونه خلاصه‌سازی، تلفیق یا حذف ردیف‌ها و سرفصل‌های فرعی اکیداً ممنوع است.
+   - **شکستن اتمیک سرفصل‌های فرعی (Atomic Sub-category Preservation):** مواردی که در مرجع انگلیسی در داخل پرانتز یا به عنوان نمونه ذکر شده‌اند (نظیر آدنوما، کارسینوما، لنفوم، لوسمی، مسمومیت با آلومینیوم در نارسایی کلیوی و...) باید تک‌به‌تک و به صورت اتمیک در ستون مربوطه یا در قالب سطرهای مجزا با ترجمه دقیق فارسی ترجمه شوند.
+   - **گیت ممیزی تمامیت جدول (`TABLE_COMPLETENESS_GATE`):**
+     - خطای قطعی `MISSING_TABLE_DATA` (سطح شدت `error`): چنانچه اسلاید حاوی جدول برداری یا تصویر اسکرین‌شات جدول باشد (`has_tables: true` یا `has_image_table: true`) اما شیء `table_data` در ترجمه اسلاید درج نشده باشد، پایپ‌لاین بلافاصله متوقف می‌شود.
+     - خطای قطعی `INCOMPLETE_TABLE_TRANSCRIPTION` (سطح شدت `error`): چنانچه جدول ترجمه‌شده فاقد ردیف باشد (`len(rows) == 0`) یا بازخوانی مفاهیم ماهوی آن از ۵۰٪ کمتر باشد (نشان‌دهنده جاافتادن ردیف‌های بالینی نظیر مسمومیت با آلومینیوم)، خطای سخت مسدودکننده صادر شده و مدل ملزم به تکمیل سطر به سطر جدول می‌گردد.
+   - **پوشش سلولی در موتور ارزیابی توکن‌ها:** کلیه متون موجود در `headers` و تمام سلول‌های `rows` جدول به صورت خودکار در متغیر ارزیابی مفاهیم (`trans_searchable` و `trans_tokens`) لحاظ می‌شوند تا هیچ واژه تخصصی جدولی از قلم نیفتد.
 
 ---
 

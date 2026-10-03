@@ -339,15 +339,32 @@ def _check_structural_extras(num: int, raw_item: dict, trans_item: dict, issues:
         })
         
     has_tbl = bool(raw_item.get("has_tables") or raw_item.get("has_image_table") or trans_item.get("has_table"))
-    if has_tbl and not trans_item.get("table_data"):
-        warn_msg = f"MISSING TABLE DATA at Slide {num}: Presentation slide contains a structured or visual table, but 'table_data' is missing from translated_slides.json!"
+    td = trans_item.get("table_data")
+    if has_tbl and not td:
+        err_msg = f"MISSING TABLE DATA at Slide {num}: Presentation slide contains a structured or visual table, but 'table_data' is missing from translated_slides.json!"
         issues.append({
             "type": "MISSING_TABLE_DATA",
             "error_type": "MISSING_TABLE_DATA",
-            "severity": "warning",
+            "severity": "error",
             "slide_number": num,
-            "message": warn_msg
+            "message": err_msg,
+            "remediation_action": "Provide complete 'table_data' with 'headers' and 'rows' for this table slide."
         })
+    elif has_tbl and td:
+        rows = []
+        if isinstance(td, dict):
+            rows = td.get("rows") or td.get("items", [])
+        elif isinstance(td, (list, tuple)) and len(td) == 2:
+            rows = td[1]
+        if not rows:
+            issues.append({
+                "type": "INCOMPLETE_TABLE_TRANSCRIPTION",
+                "error_type": "INCOMPLETE_TABLE_TRANSCRIPTION",
+                "severity": "error",
+                "slide_number": num,
+                "message": f"INCOMPLETE TABLE at Slide {num}: 'table_data' has 0 rows! A structured or image table must contain all translated rows.",
+                "remediation_action": "Populate 'table_data.rows' with all rows from the presentation table."
+            })
 
 def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, allow_review: bool = False) -> list[dict]:
     """
@@ -397,13 +414,74 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
             b_txt = str(b)
             trans_searchable += " " + b_txt
             trans_bullet_texts.append(b_txt)
+
+    trans_table_texts = []
+    td = trans_item.get("table_data")
+    if td:
+        if isinstance(td, dict):
+            headers = td.get("headers", [])
+            for h in headers:
+                if isinstance(h, str):
+                    trans_searchable += " " + h
+                    trans_table_texts.append(h)
+            rows = td.get("rows") or td.get("items", [])
+            for row in rows:
+                if isinstance(row, dict):
+                    if "text" in row and isinstance(row["text"], str):
+                        trans_searchable += " " + row["text"]
+                        trans_table_texts.append(row["text"])
+                    if "cols" in row and isinstance(row["cols"], (list, tuple)):
+                        for c in row["cols"]:
+                            if isinstance(c, str):
+                                trans_searchable += " " + c
+                                trans_table_texts.append(c)
+                elif isinstance(row, (list, tuple)):
+                    for c in row:
+                        if isinstance(c, str):
+                            trans_searchable += " " + c
+                            trans_table_texts.append(c)
+                elif isinstance(row, str):
+                    trans_searchable += " " + row
+                    trans_table_texts.append(row)
+        elif isinstance(td, (list, tuple)) and len(td) == 2:
+            headers, rows = td
+            if isinstance(headers, (list, tuple)):
+                for h in headers:
+                    if isinstance(h, str):
+                        trans_searchable += " " + h
+                        trans_table_texts.append(h)
+            if isinstance(rows, (list, tuple)):
+                for row in rows:
+                    if isinstance(row, dict):
+                        if "text" in row and isinstance(row["text"], str):
+                            trans_searchable += " " + row["text"]
+                            trans_table_texts.append(row["text"])
+                        if "cols" in row and isinstance(row["cols"], (list, tuple)):
+                            for c in row["cols"]:
+                                if isinstance(c, str):
+                                    trans_searchable += " " + c
+                                    trans_table_texts.append(c)
+                    elif isinstance(row, (list, tuple)):
+                        for c in row:
+                            if isinstance(c, str):
+                                trans_searchable += " " + c
+                                trans_table_texts.append(c)
+                    elif isinstance(row, str):
+                        trans_searchable += " " + row
+                        trans_table_texts.append(row)
+
     trans_tokens = extract_tokens([trans_searchable])
     trans_bullet_tokens = extract_tokens(trans_bullet_texts)
+    trans_table_tokens = extract_tokens(trans_table_texts)
+    trans_body_tokens = trans_bullet_tokens.union(trans_table_tokens)
 
-    body_common = evaluate_concept_overlap(raw_body_tokens, trans_bullet_tokens, " ".join(trans_bullet_texts))
+    body_common = evaluate_concept_overlap(raw_body_tokens, trans_body_tokens, " ".join(trans_bullet_texts + trans_table_texts))
     
     ceremonial = is_ceremonial_slide(trans_item) or is_ceremonial_slide(raw_item)
+    has_tbl_content = bool(raw_item.get("has_tables") or raw_item.get("has_image_table") or trans_item.get("has_table") or trans_item.get("table_data"))
     is_image_heavy = bool(raw_item.get("is_image_heavy", False) or (raw_item.get("has_images", False) and len(raw_tokens) < 5))
+    if has_tbl_content:
+        is_image_heavy = False
     ocr_uncertain = bool(raw_item.get("ocr_uncertain", False))
     ocr_conf = float(raw_item.get("ocr_confidence", 0.0))
     has_image_text = bool(raw_item.get("has_image_text", False) and not ocr_uncertain and ocr_conf >= 0.60)
@@ -589,6 +667,35 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                         "missing_from_ocr": missing_ocr,
                         "message": err_msg,
                         "remediation_action": f"Translate missing substantive concepts {missing_tokens[:5]} directly from Raw Slide {num}."
+                    })
+
+        # Check 3.3.0: Table Completeness & Substantive Coverage Gate (Strict Diagnostic Preservation)
+        if has_tbl_content and td:
+            raw_table_tokens = set()
+            if raw_item.get("has_image_table") or (raw_item.get("has_images") and ocr_lines):
+                raw_table_tokens = raw_ocr_tokens
+            elif raw_item.get("has_tables"):
+                table_lines = [l for l in raw_lines if "|" in l or "\t" in l]
+                if not table_lines:
+                    table_lines = raw_lines
+                raw_table_tokens = extract_substantive_tokens(table_lines)
+            elif ocr_lines:
+                raw_table_tokens = raw_ocr_tokens
+            
+            if len(raw_table_tokens) >= 4:
+                table_common = evaluate_concept_overlap(raw_table_tokens, trans_table_tokens, " ".join(trans_table_texts))
+                table_recall = len(table_common) / max(1, len(raw_table_tokens))
+                if table_recall < 0.50:
+                    missing_concepts = sorted(list(raw_table_tokens - table_common))[:8]
+                    issues.append({
+                        "type": "INCOMPLETE_TABLE_TRANSCRIPTION",
+                        "error_type": "INCOMPLETE_TABLE_TRANSCRIPTION",
+                        "severity": "error",
+                        "slide_number": num,
+                        "message": (f"INCOMPLETE TABLE TRANSCRIPTION at Slide {num}: Table substantive recall is {table_recall:.1%} "
+                                    f"(threshold: 50.0%). Key table rows, subcategories, or diagnostic criteria were omitted or summarized away. "
+                                    f"Uncovered table concepts: {missing_concepts}"),
+                        "remediation_action": "Translate 100% of rows, subcategories, and parenthetical items in table_data without omitting clinical details."
                     })
 
         # Check 3.3.1: Anti-Clause Parentheses Gate (Strict Parenthetical Entity Enforcement)
