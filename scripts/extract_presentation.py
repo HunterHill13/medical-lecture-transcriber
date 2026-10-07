@@ -69,6 +69,67 @@ def run_ocr_on_image(img_path: str):
     except Exception:
         return [], 0.0, False, False
 
+def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
+    """
+    Converts vector, metafile, and specialized image formats (WMF, EMF, SVG, WebP, TIFF, BMP)
+    to standard high-resolution PNG.
+    Returns path to converted PNG if successful, or original path/None on failure.
+    """
+    if not src_path or not os.path.exists(src_path):
+        return None
+    base, ext = os.path.splitext(src_path)
+    ext_l = ext.lower()
+    if ext_l == ".png":
+        return src_path
+        
+    if not dst_path:
+        dst_path = base + ".png"
+        
+    # 1. Try Pillow (supports WMF via WmfImagePlugin, WebP, TIFF, BMP)
+    try:
+        from PIL import Image, WmfImagePlugin
+        with Image.open(src_path) as img:
+            img.convert("RGB").save(dst_path, "PNG")
+            if os.path.exists(dst_path):
+                return dst_path
+    except Exception:
+        pass
+
+    # 2. Try PyMuPDF (supports SVG, PDF, and various image formats)
+    try:
+        import pymupdf
+        doc = pymupdf.open(src_path)
+        if len(doc) > 0:
+            pix = doc[0].get_pixmap(dpi=150)
+            pix.save(dst_path)
+            if os.path.exists(dst_path):
+                return dst_path
+    except Exception:
+        pass
+
+    # 3. Windows Native fallback: System.Drawing via PowerShell (native support for WMF, EMF, BMP, etc.)
+    if sys.platform == "win32":
+        try:
+            ps_script = (
+                f"Add-Type -AssemblyName System.Drawing; "
+                f"$img = [System.Drawing.Image]::FromFile('{os.path.abspath(src_path)}'); "
+                f"$img.Save('{os.path.abspath(dst_path)}', [System.Drawing.Imaging.ImageFormat]::Png); "
+                f"$img.Dispose();"
+            )
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                timeout=15
+            )
+            if os.path.exists(dst_path):
+                return dst_path
+        except Exception:
+            pass
+
+    return src_path
+
 def render_pptx_slides_to_images(pptx_path: str, img_dir: str) -> bool:
     """
     Attempts full-slide rendering of PPTX presentations to high-resolution PNGs (slide_01.png, ...)
@@ -212,6 +273,9 @@ def extract_pptx(pptx_path, img_dir=None):
                         if not os.path.exists(img_path):
                             with open(img_path, "wb") as f_img:
                                 f_img.write(img_bytes)
+                        if ext.lower() != "png":
+                            png_target = os.path.join(img_dir, f"slide_{slide_num:02d}_img.png")
+                            convert_image_to_png(img_path, png_target)
                     except Exception as e:
                         sys.stderr.write(f"WARNING: Failed to extract shape image on slide {slide_num}: {e}\n")
                         image_extraction_error = True
@@ -236,12 +300,32 @@ def extract_pptx(pptx_path, img_dir=None):
             full_img = os.path.join(img_dir, f"slide_{slide_num:02d}.png")
             if os.path.exists(full_img):
                 candidate_img = full_img
-            elif is_text_empty or has_images:
-                for ext_cand in ("png", "jpg", "jpeg"):
+            elif is_text_empty or has_images or has_charts:
+                for ext_cand in ("png", "jpg", "jpeg", "wmf", "emf", "webp", "tiff", "tif", "bmp", "svg"):
                     single_img = os.path.join(img_dir, f"slide_{slide_num:02d}_img.{ext_cand}")
                     if os.path.exists(single_img):
+                        if ext_cand.lower() != "png":
+                            png_target = os.path.join(img_dir, f"slide_{slide_num:02d}_img.png")
+                            conv = convert_image_to_png(single_img, png_target)
+                            if conv and os.path.exists(conv):
+                                candidate_img = conv
+                                break
                         candidate_img = single_img
                         break
+                if not candidate_img and os.path.exists(img_dir):
+                    prefix = f"slide_{slide_num:02d}"
+                    for f in sorted(os.listdir(img_dir)):
+                        if f.startswith(prefix) and any(f.lower().endswith(f".{x}") for x in ("png", "jpg", "jpeg", "wmf", "emf", "webp", "tiff", "tif", "bmp", "svg")):
+                            cand_path = os.path.join(img_dir, f)
+                            if not f.lower().endswith(".png"):
+                                png_target = os.path.join(img_dir, f"{os.path.splitext(f)[0]}.png")
+                                conv = convert_image_to_png(cand_path, png_target)
+                                if conv and os.path.exists(conv):
+                                    candidate_img = conv
+                                    break
+                            candidate_img = cand_path
+                            break
+
         # Run OCR if visual content exists OR if text is sparse (< 5 words)
         if candidate_img and (has_visuals or total_words < 5 or is_text_empty):
             ocr_lines, ocr_conf, ocr_confident, ocr_uncertain = run_ocr_on_image(candidate_img)
@@ -277,6 +361,7 @@ def extract_pptx(pptx_path, img_dir=None):
             "ocr_uncertain": ocr_uncertain,
             "needs_student_review": ocr_uncertain,
             "ocr_hint": "⚠️ Visual table detected via OCR. Agent MUST produce complete table_data." if has_image_table else ("⚠️ Visual text detected via OCR (diagram/micrograph labels). Agent MUST translate labels." if has_image_text else ("⚠️ Pure visual slide without text." if is_pure_visual else "")),
+            "img_path": candidate_img,
             "image_extraction_error": image_extraction_error
         }
         if img_dir and not full_rendered:
@@ -404,6 +489,7 @@ def extract_pdf(pdf_path, img_dir=None):
             "needs_student_review": ocr_uncertain,
             "student_review_note": "⚠️ بازبینی دانشجو: متن استخراج‌شده با OCR دارای عدم قطعیت آماری یا کیفیت پایین است." if ocr_uncertain else "",
             "ocr_hint": "⚠️ Visual text detected via OCR (diagram/micrograph labels). Agent MUST translate labels." if has_image_text else ("⚠️ Scanned/image page without text layer." if is_scanned else ""),
+            "img_path": img_path,
             "image_extraction_error": image_extraction_error
         })
         

@@ -366,7 +366,31 @@ def _check_structural_extras(num: int, raw_item: dict, trans_item: dict, issues:
                 "remediation_action": "Populate 'table_data.rows' with all rows from the presentation table."
             })
 
-def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, allow_review: bool = False) -> list[dict]:
+def check_visual_asset_presence(num: int, raw_item: dict, trans_item: dict, img_dir: str = None) -> bool:
+    """
+    Checks if a visual asset (chart/diagram image) is available for the given slide.
+    Checks:
+    1. trans_item['img_path'] pointing to an existing file
+    2. raw_item['img_path'] pointing to an existing file
+    3. img_dir containing slide_{num:02d}.* or slide_{num:02d}_img.* or slide_{num}.*
+    """
+    for p in (trans_item.get("img_path"), raw_item.get("img_path")):
+        if p and os.path.exists(p):
+            return True
+            
+    if img_dir and os.path.isdir(img_dir):
+        exts = ("png", "jpg", "jpeg", "wmf", "emf", "webp", "tiff", "tif", "bmp", "svg")
+        prefixes = (f"slide_{num:02d}", f"slide_{num:03d}", f"slide_{num}_", f"slide_{num}.")
+        try:
+            for f in os.listdir(img_dir):
+                fl = f.lower()
+                if any(fl.startswith(p) for p in prefixes) and any(fl.endswith(f".{x}") for x in exts):
+                    return True
+        except Exception:
+            pass
+    return False
+
+def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, allow_review: bool = False, img_dir: str = None) -> list[dict]:
     """
     Validates alignment, content fidelity, and hallucination bounds between a single raw slide and its translation.
     Returns a list of issue dictionaries:
@@ -512,6 +536,20 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
             "message": f"IMAGE EXTRACTION FAILED at Slide {num}: Embedded image extraction or rendering failed during presentation extraction. Visual inspection recommended.",
             "remediation_action": f"Inspect Slide {num} in presentation source or verify extracted slide image in image directory."
         })
+        
+    # Check 3.0.1: Visual Asset Presence Audit for Charts / Graphs
+    if raw_item.get("has_charts") or raw_item.get("has_smartart"):
+        has_asset = check_visual_asset_presence(num, raw_item, trans_item, img_dir=img_dir)
+        if not has_asset:
+            issues.append({
+                "type": "VISUAL_ASSET_AUDIT",
+                "error_type": "VISUAL_ASSET_AUDIT",
+                "severity": "warning",
+                "slide_number": num,
+                "message": (f"VISUAL ASSET AUDIT at Slide {num}: Presentation slide contains a chart or graphical diagram (has_charts: True), "
+                            f"but no resolved visual asset (img_path or slide_images file) was found! Ensure vector/WMF graphics are extracted and rasterized to PNG."),
+                "remediation_action": f"Verify extraction of chart/diagram image for Slide {num} into slide_images and rasterize to PNG."
+            })
         
     # Check 3.1: Phantom Content Hallucination Check for Pure Visual / Empty Raw Slides
     # Slides bearing OCR text (micrograph captions, diagram labels) are legitimate image-text slides, NOT pure visual.
@@ -930,6 +968,7 @@ def main():
     parser.add_argument("--auto-fix", action="store_true", help="Automatically repair missing slide gaps")
     parser.add_argument("--ref-corpus", help="Optional path to reference book corpus (file/folder) for ref_note grounding verification")
     parser.add_argument("--allow-review", action="store_true", help="Allow REVIEW_REQUIRED state for slides with needs_student_review: true")
+    parser.add_argument("--img-dir", default=None, help="Optional slide images directory to audit visual assets (e.g. ./slide_images)")
     args = parser.parse_args()
     
     if not os.path.exists(args.raw):
@@ -1094,10 +1133,11 @@ def main():
             })
             
     # Check 3: Anchor Word Alignment and Shift Detection
+    img_dir_audit = args.img_dir or ("./slide_images" if os.path.isdir("./slide_images") else None)
     for num in range(1, min(total_raw, total_trans) + 1):
         raw_item = raw_db[num]
         trans_item = trans_db[num]
-        slide_issues = check_slide_pair(raw_item, trans_item, trans_db, allow_review=getattr(args, "allow_review", False))
+        slide_issues = check_slide_pair(raw_item, trans_item, trans_db, allow_review=getattr(args, "allow_review", False), img_dir=img_dir_audit)
         for issue in slide_issues:
             if issue.get("severity") == "error":
                 errors.append(issue["message"])

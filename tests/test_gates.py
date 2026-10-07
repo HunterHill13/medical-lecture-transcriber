@@ -1735,6 +1735,54 @@ def test_slide_45_complete_table_transcription_passes():
     assert len(errors) == 0, f"Expected 0 errors for complete slide 45 table, got: {errors}"
 
 
+def test_visual_asset_audit_triggers_when_chart_image_missing():
+    """Verifies VISUAL_ASSET_AUDIT emits a warning when a slide has has_charts: True but no image asset exists."""
+    raw_item = {
+        "slide_number": 39,
+        "title_raw": "Microvascular and Macrovascular Risk Curve",
+        "text_lines": ["HbA1c risk correlation curve"],
+        "has_charts": True,
+        "has_images": True
+    }
+    trans_item = {
+        "slide_number": 39,
+        "title_fa": "نمودار مقایسه شیب بروز عوارض",
+        "title_en": "Microvascular and Macrovascular Risk Curve",
+        "bullets": [
+            {"lead": "نمودار بالینی", "text": "همبستگی مستقیم میزان قند و عوارض میکروواسکولار"}
+        ]
+    }
+    issues = check_slide_pair(raw_item, trans_item, img_dir=None)
+    assert any(i.get("type") == "VISUAL_ASSET_AUDIT" and i.get("severity") == "warning" for i in issues)
+
+
+def test_visual_asset_audit_passes_when_image_resolved(tmp_path):
+    """Verifies VISUAL_ASSET_AUDIT passes when img_path points to an existing file."""
+    fake_img = str(tmp_path / "slide_39_img.png")
+    with open(fake_img, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\nfake")
+
+    raw_item = {
+        "slide_number": 39,
+        "title_raw": "Microvascular and Macrovascular Risk Curve",
+        "text_lines": ["HbA1c risk correlation curve"],
+        "has_charts": True,
+        "img_path": fake_img
+    }
+    trans_item = {
+        "slide_number": 39,
+        "title_fa": "نمودار مقایسه شیب بروز عوارض",
+        "title_en": "Microvascular and Macrovascular Risk Curve",
+        "img_path": fake_img,
+        "bullets": [
+            {"lead": "نمودار بالینی", "text": "همبستگی مستقیم میزان قند و عوارض میکروواسکولار"}
+        ]
+    }
+    issues = check_slide_pair(raw_item, trans_item)
+    assert not any(i.get("type") == "VISUAL_ASSET_AUDIT" for i in issues)
+
+
+
 
 
 

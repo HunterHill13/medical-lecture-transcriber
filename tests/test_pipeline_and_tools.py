@@ -179,3 +179,36 @@ def test_transcribe_chunks_mime_type_and_policy():
     assert get_mime_type("speech.wav") == "audio/wav"
     assert get_mime_type("recording.ogg") == "audio/ogg"
 
+
+def test_create_slide_pamphlet_advisory_banner_on_missing_chart(tmp_path):
+    from create_slide_pamphlet import build_pamphlet_from_json
+    import json
+    
+    slides_data = [
+        {
+            "slide_number": 39,
+            "title_fa": "نمودار مقایسه شیب بروز عوارض",
+            "title_en": "Microvascular Risk Curve",
+            "has_charts": True,
+            "bullets": [
+                {"lead": "نکته کلیدی", "text": "همبستگی مستقیم HbA1c و عوارض"}
+            ]
+        }
+    ]
+    json_path = tmp_path / "translated.json"
+    json_path.write_text(json.dumps(slides_data, ensure_ascii=False), encoding="utf-8")
+    out_docx = str(tmp_path / "pamphlet.docx")
+    
+    build_pamphlet_from_json(str(json_path), out_docx, img_dir=str(tmp_path / "empty_imgs"))
+    assert os.path.exists(out_docx)
+    
+    doc = docx.Document(out_docx)
+    text_content = "\n".join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
+            for cell in row.cells:
+                text_content += "\n" + "\n".join(p.text for p in cell.paragraphs)
+                
+    assert "تذکر آموزشی: این اسلاید حاوی نمودار/شکل تخصصی است" in text_content
+
+

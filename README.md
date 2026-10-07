@@ -1,11 +1,11 @@
-# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.2.0)
+# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.3.0)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/Tests-107%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-112%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-5.2.0-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/Version-5.3.0-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Google%20Antigravity-Compatible-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -44,8 +44,13 @@ Prevents translation shortcuts and visual pollution:
 * Filters OCR noise using statistical confidence thresholds (`mean_conf >= 0.60`, substantive tokens $\ge 2$).
 * Displays warning banners in Word documents if embedded image extraction fails.
 
-### 7. 🧪 107-Test Automated Quality Suite
-* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, and schema integrity.
+### 7. 📈 Universal Vector & Chart Rasterization Engine (`convert_image_to_png`)
+* Automatically detects and converts non-raster vector shapes, metafiles, and specialized formats (`.wmf`, `.emf`, `.svg`, `.webp`, `.tiff`, `.bmp`) to standard PNG during both presentation extraction and Word compilation.
+* Dynamic multi-pattern candidate discovery (`find_and_prepare_slide_image`) resolves any slide chart or diagram graphic asset without hardcoded filename fragility.
+* Enforces the `VISUAL_ASSET_AUDIT` gate and renders student advisory banners when graphic chart assets cannot be embedded.
+
+### 8. 🧪 112-Test Automated Quality Suite
+* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, and schema integrity.
 
 ---
 

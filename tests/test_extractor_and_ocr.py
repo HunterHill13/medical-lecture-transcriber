@@ -786,6 +786,46 @@ def test_detect_image_table_negative_for_plain_diagram():
     assert is_table is False, "Expected plain anatomical diagram not to be flagged as image table"
 
 
+def test_convert_image_to_png(tmp_path):
+    """Verifies convert_image_to_png accurately converts supported formats to PNG."""
+    from PIL import Image
+    from extract_presentation import convert_image_to_png
+
+    # Create dummy BMP image
+    bmp_path = str(tmp_path / "sample.bmp")
+    img = Image.new("RGB", (60, 30), color="blue")
+    img.save(bmp_path, "BMP")
+
+    png_path = convert_image_to_png(bmp_path)
+    assert png_path is not None
+    assert os.path.exists(png_path)
+    assert png_path.endswith(".png")
+
+    with Image.open(png_path) as res_img:
+        assert res_img.format == "PNG"
+        assert res_img.size == (60, 30)
+
+
+def test_find_and_prepare_slide_image_dynamic_discovery(tmp_path):
+    """Verifies find_and_prepare_slide_image finds non-standard slide image names and auto-converts."""
+    from PIL import Image
+    from create_slide_pamphlet import find_and_prepare_slide_image
+
+    img_dir = str(tmp_path / "images")
+    os.makedirs(img_dir, exist_ok=True)
+
+    # Create slide_39_chart.bmp
+    chart_path = os.path.join(img_dir, "slide_39_chart.bmp")
+    img = Image.new("RGB", (100, 50), color="red")
+    img.save(chart_path, "BMP")
+
+    found_png = find_and_prepare_slide_image(img_dir, 39)
+    assert found_png is not None
+    assert os.path.exists(found_png)
+    assert found_png.endswith(".png")
+
+
+
 
 
 

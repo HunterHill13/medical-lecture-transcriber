@@ -48,6 +48,109 @@ from text_utils import (
     flatten_spoken_lecture
 )
 
+def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
+    """
+    Converts vector, metafile, and specialized image formats (WMF, EMF, SVG, WebP, TIFF, BMP)
+    to standard high-resolution PNG.
+    Returns path to converted PNG if successful, or original path/None on failure.
+    """
+    if not src_path or not os.path.exists(src_path):
+        return None
+    base, ext = os.path.splitext(src_path)
+    ext_l = ext.lower()
+    if ext_l == ".png":
+        return src_path
+        
+    if not dst_path:
+        dst_path = base + ".png"
+        
+    # 1. Try Pillow (supports WMF via WmfImagePlugin, WebP, TIFF, BMP)
+    try:
+        from PIL import Image, WmfImagePlugin
+        with Image.open(src_path) as img:
+            img.convert("RGB").save(dst_path, "PNG")
+            if os.path.exists(dst_path):
+                return dst_path
+    except Exception:
+        pass
+
+    # 2. Try PyMuPDF (supports SVG, PDF, and various image formats)
+    try:
+        import pymupdf
+        doc = pymupdf.open(src_path)
+        if len(doc) > 0:
+            pix = doc[0].get_pixmap(dpi=150)
+            pix.save(dst_path)
+            if os.path.exists(dst_path):
+                return dst_path
+    except Exception:
+        pass
+
+    # 3. Windows Native fallback: System.Drawing via PowerShell (native support for WMF, EMF, BMP, etc.)
+    if sys.platform == "win32":
+        try:
+            import subprocess
+            ps_script = (
+                f"Add-Type -AssemblyName System.Drawing; "
+                f"$img = [System.Drawing.Image]::FromFile('{os.path.abspath(src_path)}'); "
+                f"$img.Save('{os.path.abspath(dst_path)}', [System.Drawing.Imaging.ImageFormat]::Png); "
+                f"$img.Dispose();"
+            )
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                timeout=15
+            )
+            if os.path.exists(dst_path):
+                return dst_path
+        except Exception:
+            pass
+
+    return src_path
+
+def find_and_prepare_slide_image(img_dir: str, slide_num: int) -> str | None:
+    """
+    Dynamically searches img_dir for any candidate image representing slide_num,
+    converting vector/metafile images (WMF/EMF/SVG) to standard PNG if needed.
+    """
+    if not img_dir or not os.path.isdir(img_dir):
+        return None
+        
+    exts = ("png", "jpg", "jpeg", "wmf", "emf", "webp", "tiff", "tif", "bmp", "svg")
+    patterns = [
+        f"slide_{slide_num:03d}",
+        f"slide_{slide_num:02d}",
+        f"slide_{slide_num}",
+        f"slide_{slide_num:03d}_img",
+        f"slide_{slide_num:02d}_img",
+        f"slide_{slide_num}_img"
+    ]
+    
+    # 1. Exact priority matches
+    for pat in patterns:
+        for ext in exts:
+            cand = os.path.join(img_dir, f"{pat}.{ext}")
+            if os.path.exists(cand):
+                return convert_image_to_png(cand)
+                
+    # 2. Dynamic directory scan matching slide number prefix
+    try:
+        files = sorted(os.listdir(img_dir))
+        target_prefixes = (f"slide_{slide_num:02d}", f"slide_{slide_num:03d}", f"slide_{slide_num}_", f"slide_{slide_num}.")
+        for f in files:
+            f_lower = f.lower()
+            if any(f_lower.startswith(p) for p in target_prefixes):
+                if any(f_lower.endswith(f".{ext}") for ext in exts):
+                    cand = os.path.join(img_dir, f)
+                    return convert_image_to_png(cand)
+    except Exception:
+        pass
+        
+    return None
+
+
 def set_p_rtl(p, space_before=2, space_after=3, line_spacing=1.15, align_justify=False):
     p.paragraph_format.space_before = Pt(space_before)
     p.paragraph_format.space_after = Pt(space_after)
@@ -258,21 +361,23 @@ def add_bullet_p(doc, lead, body):
     return p
 
 def add_figure_with_caption(doc, img_path, caption_title, caption_text="", max_width_in=5.2):
-    if os.path.exists(img_path):
-        p = doc.add_paragraph()
-        p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
-        p.paragraph_format.space_before = Pt(8)
-        p.paragraph_format.space_after = Pt(2)
-        run = p.add_run()
-        run.add_picture(img_path, width=Inches(max_width_in))
-        
-        cp = doc.add_paragraph()
-        set_p_rtl(cp, space_before=2, space_after=8)
-        cp.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
-        add_r(cp, f"🖼️ {caption_title} ", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
-        if caption_text:
-            add_r(cp, f"— {caption_text}", font_name="Dubai", size_pt=10, italic=True, color_rgb=(0x55, 0x55, 0x55))
-        return True
+    if img_path and os.path.exists(img_path):
+        final_img = convert_image_to_png(img_path)
+        if final_img and os.path.exists(final_img):
+            p = doc.add_paragraph()
+            p.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            p.paragraph_format.space_before = Pt(8)
+            p.paragraph_format.space_after = Pt(2)
+            run = p.add_run()
+            run.add_picture(final_img, width=Inches(max_width_in))
+            
+            cp = doc.add_paragraph()
+            set_p_rtl(cp, space_before=2, space_after=8)
+            cp.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+            add_r(cp, f"🖼️ {caption_title} ", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
+            if caption_text:
+                add_r(cp, f"— {caption_text}", font_name="Dubai", size_pt=10, italic=True, color_rgb=(0x55, 0x55, 0x55))
+            return True
     return False
 
 def add_qa_box(doc, question, answer):
@@ -578,20 +683,35 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     
     first_item = True
     # Embed screenshot for visual slides (diagram, table, or image-only) unless already placed in Track 1
+    embedded_successfully = False
     if is_visual and img_path and os.path.exists(img_path) and not image_already_shown:
-        ip = cell1.paragraphs[0] if first_item else cell1.add_paragraph()
-        first_item = False
-        ip.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
-        ip.paragraph_format.space_before = Pt(4)
-        ip.paragraph_format.space_after = Pt(6)
-        run = ip.add_run()
-        run.add_picture(img_path, width=Inches(4.8))
-    elif slide_data.get("image_extraction_error"):
-        ip = cell1.paragraphs[0] if first_item else cell1.add_paragraph()
-        first_item = False
-        set_p_rtl(ip, space_before=2, space_after=3)
-        add_r(ip, "⚠️ [هشدار سیستم: استخراج تصویر این اسلاید با خطا مواجه شد؛ لطفاً فایل اصلی اسلاید را بررسی کنید.]",
-              font_name="Dubai", size_pt=9.5, italic=True, color_rgb=(0xC0, 0x39, 0x2B))
+        try:
+            final_img = convert_image_to_png(img_path)
+            if final_img and os.path.exists(final_img):
+                ip = cell1.paragraphs[0] if first_item else cell1.add_paragraph()
+                first_item = False
+                ip.alignment = docx.enum.text.WD_ALIGN_PARAGRAPH.CENTER
+                ip.paragraph_format.space_before = Pt(4)
+                ip.paragraph_format.space_after = Pt(6)
+                run = ip.add_run()
+                run.add_picture(final_img, width=Inches(4.8))
+                embedded_successfully = True
+        except Exception as e:
+            sys.stderr.write(f"WARNING: Failed to embed picture for slide {slide_num}: {e}\n")
+
+    if not embedded_successfully and not image_already_shown:
+        if slide_data.get("image_extraction_error"):
+            ip = cell1.paragraphs[0] if first_item else cell1.add_paragraph()
+            first_item = False
+            set_p_rtl(ip, space_before=2, space_after=3)
+            add_r(ip, "⚠️ [هشدار سیستم: استخراج تصویر این اسلاید با خطا مواجه شد؛ لطفاً فایل اصلی اسلاید را بررسی کنید.]",
+                  font_name="Dubai", size_pt=9.5, italic=True, color_rgb=(0xC0, 0x39, 0x2B))
+        elif is_visual and (slide_data.get("has_charts") or slide_data.get("has_images") or slide_data.get("is_pure_visual")):
+            ip = cell1.paragraphs[0] if first_item else cell1.add_paragraph()
+            first_item = False
+            set_p_rtl(ip, space_before=2, space_after=3)
+            add_r(ip, "⚠️ [تذکر آموزشی: این اسلاید حاوی نمودار/شکل تخصصی است؛ جهت مشاهده تصویر به فایل ارائه اصلی مراجعه نمایید.]",
+                  font_name="Dubai", size_pt=9.5, italic=True, color_rgb=(0xD3, 0x54, 0x00))
         
     for b in bullets:
         bp = cell1.paragraphs[0] if first_item else cell1.add_paragraph()
@@ -878,20 +998,10 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
                 
         # Track 2: Slide Box
         img_path = slide.get("img_path")
-        if not img_path and img_dir:
-            candidates = [
-                os.path.join(img_dir, f"slide_{num:03d}.png"),
-                os.path.join(img_dir, f"slide_{num:02d}.png"),
-                os.path.join(img_dir, f"slide_{num:02d}_img.png"),
-                os.path.join(img_dir, f"slide_{num:02d}_img.jpg"),
-                os.path.join(img_dir, f"slide_{num:02d}_img.jpeg"),
-                os.path.join(img_dir, f"slide_{num:03d}_img.png"),
-                os.path.join(img_dir, f"slide_{num:03d}_img.jpg"),
-            ]
-            for c in candidates:
-                if os.path.exists(c):
-                    img_path = c
-                    break
+        if img_path and os.path.exists(img_path):
+            img_path = convert_image_to_png(img_path)
+        elif img_dir:
+            img_path = find_and_prepare_slide_image(img_dir, num)
                 
         table_data = slide.get("table_data", None)
         add_slide_box_from_json(doc, slide, img_path=img_path, table_data=table_data, ref_book_name=ref_book)

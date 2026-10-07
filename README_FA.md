@@ -1,11 +1,11 @@
-# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۲.۰)
+# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۳.۰)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=تست‌های%20خودکار%20CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/تست‌ها-۱۰۷%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/تست‌ها-۱۱۲%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/پایتون-۳.۱۱%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/نسخه-۵.۲.۰-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/نسخه-۵.۳.۰-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/مجوز-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/گوگل%20آنتی‌گرویتی-سازگار-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -44,8 +44,13 @@
 * پالایش خطاهای OCR با آستانه اطمینان آماری (`confidence >= 0.60`).
 * ثبت بنر هشدار در سند Word در صورت بروز هرگونه خطا در استخراج تصاویر اسلایدها.
 
-### ۷. 🧪 مجموعه آزمون‌های خودکار ۱۰۷ تستی
-* شامل آزمون‌های جامع یکپارچگی، عدم جابه‌جایی صفحات اسلایدها، صحت بازتولید ردیف‌های جداول، خط زمانی صوتی و ساختار داده‌ها.
+### ۷. 📈 موتور همگانی رندرسازی برداری نمودارها و تصاویر متای ویندوز (`convert_image_to_png`)
+* تبدیل خودکار و بلادرنگ انواع فرمت‌های برداری و تخصصی نظیر WMF، EMF، SVG، WebP و TIFF به PNG استاندارد با وضوح بالا، هم در مرحله استخراج اسلاید و هم در مرحله کامپایل سند Word.
+* جستجوی پویای الگوهای نام‌گذاری فایل‌های نگاره با تابع `find_and_prepare_slide_image` و رفع وابستگی شکننده به نام‌های ثابت.
+* پیاده‌سازی گیت `VISUAL_ASSET_AUDIT` برای نظارت بر وجود فیزیکی تصاویر نمودارها در کنار بنر آموزشی هوشمند در فایل Word در صورت فقدان تصویر نمودار.
+
+### ۸. 🧪 مجموعه آزمون‌های خودکار ۱۱۲ تستی
+* شامل آزمون‌های جامع یکپارچگی، عدم جابه‌جایی صفحات اسلایدها، رندرسازی وکتورها، صحت بازتولید ردیف‌های جداول، خط زمانی صوتی و ساختار داده‌ها.
 
 ---
 
