@@ -1859,6 +1859,86 @@ def test_bilingual_concept_recall_passes_clean_persian_translation():
     assert recall >= 0.50, f"Expected recall >= 50% for fluent Persian translation, got {recall:.2f}"
 
 
+def test_duplicate_ref_title_prefix_triggers_non_blocking_advisory_and_auto_sanitizes_in_docx(tmp_path):
+    """
+    Verifies that duplicate reference note prefixes (e.g. '💡 شرح تکمیلی رفرنس (هاریسون):')
+    trigger a non-blocking diagnostic advisory warning in verify_slide_alignment.py,
+    exit code remains 0, and the pamphlet compiler auto-sanitizes the text so the
+    docx output does not contain dual prepended titles.
+    """
+    import subprocess
+    import json
+    import docx
+    from create_slide_pamphlet import build_pamphlet_from_json
+
+    raw_data = [
+        {
+            "slide_number": 1,
+            "title": "Adrenal Cortex Physiology",
+            "text_lines": ["Adrenal cortex steroid synthesis and regulation"]
+        }
+    ]
+    trans_data = [
+        {
+            "slide_number": 1,
+            "title_en": "Adrenal Cortex Physiology",
+            "title_fa": "فیزیولوژی قشر آدرنال",
+            "bullets": [
+                {
+                    "lead": "تنظیم استروئیدها (Steroid regulation):",
+                    "body": "سنتز و تنظیم هورمون‌های کورتیکواستروئیدی قشر آدرنال."
+                }
+            ],
+            "ref_note": "💡 شرح تکمیلی رفرنس (هاریسون) جهت تفهیم مبحث: قشر غده فوق‌کلیوی از سه رده هورمونی استروئیدی تشکیل شده است که هومئوستاز را تنظیم می‌نمایند."
+        }
+    ]
+
+    raw_file = tmp_path / "raw.json"
+    trans_file = tmp_path / "trans.json"
+    diag_file = tmp_path / "diag.json"
+    out_docx = tmp_path / "out.docx"
+
+    raw_file.write_text(json.dumps(raw_data, ensure_ascii=False), encoding="utf-8")
+    trans_file.write_text(json.dumps(trans_data, ensure_ascii=False), encoding="utf-8")
+
+    script_path = os.path.abspath(os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py"))
+    res = subprocess.run([
+        sys.executable, script_path,
+        "--raw", str(raw_file),
+        "--translated", str(trans_file),
+        "--diagnostic-json", str(diag_file)
+    ], capture_output=True, text=True, encoding="utf-8")
+
+    # Must be non-blocking (exit code 0)
+    assert res.returncode == 0, f"Expected returncode 0, got {res.returncode}. Output:\n{res.stdout}\n{res.stderr}"
+
+    with open(diag_file, "r", encoding="utf-8") as df:
+        diag = json.load(df)
+
+    # Must contain DUPLICATE_REF_TITLE_PREFIX advisory warning
+    assert any(w.get("warning_type") == "DUPLICATE_REF_TITLE_PREFIX" for w in diag.get("warnings", [])), (
+        f"Expected DUPLICATE_REF_TITLE_PREFIX in warnings: {diag.get('warnings')}"
+    )
+
+    # Now verify pamphlet compilation sanitizes ref_note and prevents dual prepending
+    build_pamphlet_from_json(str(trans_file), str(out_docx), ref_book="هاریسون")
+    doc = docx.Document(str(out_docx))
+
+    ref_note_paragraphs = []
+    for t in doc.tables:
+        for row in t.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    if "شرح تکمیلی رفرنس" in p.text:
+                        ref_note_paragraphs.append(p.text)
+
+    assert len(ref_note_paragraphs) == 1
+    p_text = ref_note_paragraphs[0]
+    # Check that "شرح تکمیلی رفرنس" appears EXACTLY ONCE in the paragraph
+    assert p_text.count("شرح تکمیلی رفرنس") == 1, f"Expected 'شرح تکمیلی رفرنس' exactly once, found multiple in: {p_text}"
+    assert "قشر غده فوق‌کلیوی از سه رده هورمونی" in p_text
+
+
 
 
 

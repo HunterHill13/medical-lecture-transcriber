@@ -272,3 +272,61 @@ def test_create_slide_pamphlet_renders_zero_newlines_in_runs_and_justified(tmp_p
                 justified_count += 1
     assert justified_count > 0, "No justified paragraphs found"
 
+
+def test_sanitize_ref_note_removes_duplicate_prefixes():
+    from text_utils import sanitize_ref_note, has_ref_note_prefix
+
+    cases = [
+        (
+            "💡 شرح تکمیلی رفرنس (هاریسون) جهت تفهیم مبحث: قشر غده فوق‌کلیوی از سه رده هورمونی تشکیل شده است.",
+            "قشر غده فوق‌کلیوی از سه رده هورمونی تشکیل شده است."
+        ),
+        (
+            "شرح تکمیلی رفرنس (هاریسون): قشر غده فوق‌کلیوی از سه رده هورمونی تشکیل شده است.",
+            "قشر غده فوق‌کلیوی از سه رده هورمونی تشکیل شده است."
+        ),
+        (
+            "💡 شرح تکمیلی رفرنس (هاریسون) جهت تفهیم مبحث: 💡 شرح تکمیلی رفرنس (هاریسون) جهت تفهیم مبحث: هورمون‌های استروئیدی سنتز می‌شوند.",
+            "هورمون‌های استروئیدی سنتز می‌شوند."
+        ),
+        (
+            "توضیحات تکمیلی (Cecil): بررسی بالینی نشان‌دهنده ترشح آلدوسترون است.",
+            "بررسی بالینی نشان‌دهنده ترشح آلدوسترون است."
+        ),
+        (
+            "نکات تکمیلی رفرنس - هورمون آلدوسترون در تنظیم سدیم نقش دارد.",
+            "هورمون آلدوسترون در تنظیم سدیم نقش دارد."
+        ),
+        (
+            "💡 قشر غده فوق‌کلیوی هورمون‌های استروئیدی ترشح می‌کند.",
+            "قشر غده فوق‌کلیوی هورمون‌های استروئیدی ترشح می‌کند."
+        ),
+        (
+            "Reference (Harrison): Adrenal cortex secretes three classes of steroid hormones.",
+            "Adrenal cortex secretes three classes of steroid hormones."
+        ),
+        (
+            "💡 Ref Note: Adrenal cortex glucocorticoids regulate metabolism.",
+            "Adrenal cortex glucocorticoids regulate metabolism."
+        )
+    ]
+
+    for raw, expected in cases:
+        assert has_ref_note_prefix(raw) is True
+        assert sanitize_ref_note(raw) == expected
+
+
+def test_sanitize_ref_note_preserves_clean_text():
+    from text_utils import sanitize_ref_note, has_ref_note_prefix
+
+    clean_cases = [
+        "قشر غده فوق‌کلیوی از سه رده هورمونی گلوکوکورتیکوئیدها تشکیل شده است.",
+        "شرح حال بیمار نشان‌دهنده علائم افزایش کورتیزول و سندرم کوشینگ بود.",
+        "رفرنس اصلی این مبحث کتاب هاریسون است و باید مطالعه شود.",
+        "هورمون آلدوسترون تنظیم‌کننده هومئوستاز سدیم و پتاسیم است."
+    ]
+
+    for text in clean_cases:
+        assert has_ref_note_prefix(text) is False
+        assert sanitize_ref_note(text) == text
+

@@ -1,11 +1,11 @@
-# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.4.0)
+# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.5.0)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/Tests-118%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-121%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-5.4.0-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/Version-5.5.0-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Google%20Antigravity-Compatible-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -63,8 +63,13 @@ Prevents translation shortcuts and visual pollution:
 * Dynamic multi-pattern candidate discovery (`find_and_prepare_slide_image`) resolves any slide chart or diagram graphic asset without hardcoded filename fragility.
 * Enforces the `VISUAL_ASSET_AUDIT` gate and renders student advisory banners when graphic chart assets cannot be embedded.
 
-### 11. 🧪 118-Test Automated Quality Suite
-* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, and schema integrity.
+### 11. 🛡️ Universal Reference Note Sanitization & Anti-Dual-Prepending Engine (`sanitize_ref_note`)
+* Eliminates double-title rendering bugs (Dual Prepending) where models mistakenly inject `💡 شرح تکمیلی رفرنس...` into the JSON `ref_note` value.
+* Features a robust agnostic regex parser in `text_utils.py` that strips redundant emojis, phrases, book titles, and colons while preserving pure medical commentary.
+* Connects seamlessly with `verify_slide_alignment.py` to issue informative, non-blocking `DUPLICATE_REF_TITLE_PREFIX` advisories without halting pipeline execution.
+
+### 12. 🧪 121-Test Automated Quality Suite
+* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, reference note sanitization, and schema integrity.
 
 ---
 

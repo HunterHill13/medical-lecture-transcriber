@@ -1,11 +1,11 @@
-# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۴.۰)
+# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۵.۰)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=تست‌های%20خودکار%20CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/تست‌ها-۱۱۸%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/تست‌ها-۱۲۱%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/پایتون-۳.۱۱%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/نسخه-۵.۴.۰-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/نسخه-۵.۵.۰-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/مجوز-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/گوگل%20آنتی‌گرویتی-سازگار-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -63,8 +63,13 @@
 * جستجوی پویای الگوهای نام‌گذاری فایل‌های نگاره با تابع `find_and_prepare_slide_image` و رفع وابستگی شکننده به نام‌های ثابت.
 * پیاده‌سازی گیت `VISUAL_ASSET_AUDIT` برای نظارت بر وجود فیزیکی تصاویر نمودارها در کنار بنر آموزشی هوشمند در فایل Word در صورت فقدان تصویر نمودار.
 
-### ۱۱. 🧪 مجموعه آزمون‌های خودکار ۱۱۸ تستی
-* شامل آزمون‌های جامع یکپارچگی، عدم جابه‌جایی صفحات اسلایدها، رندرسازی وکتورها، صحت بازتولید ردیف‌های جداول، تشخیص توهمات جدول، مسدودسازی جملات انگلیسی خام، خط زمانی صوتی و ساختار داده‌ها.
+### ۱۱. 🛡️ موتور پالایش خودکار یادداشت‌های رفرنس و منع تکرار دوگانه تیتر (`sanitize_ref_note`)
+* حذف قطعی و تضمین‌شده خطای تکرار دوگانه تیتر (Dual Prepending) در مواردی که مدل عبارت «💡 شرح تکمیلی رفرنس...» را درون فیلد `ref_note` در JSON ذخیره می‌کند.
+* پیاده‌سازی تحلیل‌گر منعطف رگکس مستقل از نام کتاب مرجع در `text_utils.py` جهت زدودن ایموجی‌ها، نام‌های کتاب (هاریسون، سیسیل و...) و پسوندهای تفهیم مبحث، در عین حفاظت کامل از متن اصیل علمی.
+* اتصال مستقیم به گیت اعتبارسنجی `verify_slide_alignment.py` و صدور پیام هشدار ساختاری غیرمسدودکننده (`DUPLICATE_REF_TITLE_PREFIX`) بدون ایجاد وقفه در کامپایل نهایی جزوه.
+
+### ۱۲. 🧪 مجموعه آزمون‌های خودکار ۱۲۱ تستی
+* شامل آزمون‌های جامع یکپارچگی، عدم جابه‌جایی صفحات اسلایدها، رندرسازی وکتورها، صحت بازتولید ردیف‌های جداول، تشخیص توهمات جدول، مسدودسازی جملات انگلیسی خام، پالایش یادداشت‌های رفرنس، خط زمانی صوتی و ساختار داده‌ها.
 
 ---
 

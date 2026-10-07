@@ -45,7 +45,8 @@ from text_utils import (
     clean_markdown_text,
     parse_inline_spans,
     parse_markdown_blocks,
-    flatten_spoken_lecture
+    flatten_spoken_lecture,
+    sanitize_ref_note
 )
 
 def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
@@ -597,7 +598,7 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     title_fa = slide_data.get('title_fa', f'اسلاید {slide_num}')
     title_en = slide_data.get('title_en', '')
     bullets = slide_data.get('bullets', [])
-    ref_note = slide_data.get('ref_note', '')
+    ref_note = sanitize_ref_note(slide_data.get('ref_note', ''))
     is_visual = bool(
         slide_data.get("has_table") or 
         slide_data.get("has_tables") or 

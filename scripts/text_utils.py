@@ -1305,4 +1305,57 @@ def parse_markdown_blocks(text: Union[str, list, None]) -> List[dict]:
     return blocks
 
 
+# -----------------------------------------------------------------------------
+# Reference Note (ref_note) Sanitization & Duplicate Prefix Stripping
+# -----------------------------------------------------------------------------
+
+REF_NOTE_PREFIX_PATTERN = re.compile(
+    r'^\s*(?:[💡📌ℹ️📖]+\s*)?'
+    r'(?:'
+        r'(?:شرح|نکات?|توضیحات?)\s+تکمیلی(?:\s+(?:رفرنس|مرجع))?'
+        r'|'
+        r'(?:شرح|نکات?|توضیحات?)\s+(?:رفرنس|مرجع)'
+        r'|'
+        r'(?:رفرنس|مرجع)(?=\s*[\(:：\-—])'
+        r'|'
+        r'(?:Reference|Ref|Textbook)\s*(?:Note|Commentary)?(?=\s*[\(:：\-—])'
+    r')'
+    r'(?:\s*\([^)]*\))?'
+    r'(?:\s*جهت\s+(?:تفهیم\s+مبحث|درک\s+بهتر|توضیح\s+بیشتر))?'
+    r'\s*[:：\-—]?\s*',
+    re.IGNORECASE
+)
+
+
+def has_ref_note_prefix(text: str) -> bool:
+    """
+    Checks if the given reference note starts with a redundant lead title,
+    emoji, or textbook header (e.g., '💡 شرح تکمیلی رفرنس (هاریسون):').
+    """
+    if not text or not isinstance(text, str):
+        return False
+    stripped = text.strip()
+    return bool(REF_NOTE_PREFIX_PATTERN.match(stripped) or re.match(r'^[💡📌ℹ️📖]+\s*', stripped))
+
+
+def sanitize_ref_note(text: str) -> str:
+    """
+    Strips redundant lead titles, book citations, and emojis from reference notes.
+    Ensures that ref_note contains pure substantive scientific commentary so that
+    Word rendering does not result in duplicate titles (Dual Prepending).
+    Handles repeated prefix injections and leading emojis safely.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    cleaned = text.strip()
+    while True:
+        m = REF_NOTE_PREFIX_PATTERN.match(cleaned)
+        if m and m.end() > 0:
+            cleaned = cleaned[m.end():].strip()
+        else:
+            break
+    cleaned = re.sub(r'^[💡📌ℹ️📖]+\s*', '', cleaned).strip()
+    return cleaned
+
+
 

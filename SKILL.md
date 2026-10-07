@@ -1,20 +1,21 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.4.0): enforces Table Completeness Gate
+  Publication-grade medical study guide and lecture transcription workflow (v5.5.0): enforces Table Completeness Gate
   (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table row preservation without summarization),
   Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of non-existent rows/grades),
   Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses),
+  Universal Reference Note Sanitization & Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory),
   Substantive Medical Concept Denominator Filtering (filters routine English prose verbs and fillers from recall denominator),
   Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR),
   Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT),
   Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads),
   Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 118-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 121-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.4.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.5.0)
 
 ## Overview
 
@@ -65,6 +66,7 @@ Medical study guides require 100% verifiable source provenance. Students must im
    - **Tier 3 — `[💡 شرح تکمیلی رفرنس ({ref_book_name})]` (Track 3):**
      Supplementary commentary strictly reserved for unvoiced, skipped, or under-explained slides.
      - Clearly distinguished by royal purple `#6C3483` lead and italic charcoal styling, separated from professor remarks.
+     - **قانون حیاتی عدم تکرار تیتر (Pure Scientific Content Rule):** مقدار فیلد `ref_note` در ساختار داده‌های JSON منحصراً باید حاوی «متن خالص توضیحات علمی» باشد. هرگز نباید عبارات تیتر نظیر `💡 شرح تکمیلی رفرنس...:`، نام کتاب مرجع، یا ایموجی را در مقدار `ref_note` بنویسید؛ زیرا موتور رندرینگ Word (`create_slide_pamphlet.py`) این سرتیتر را به همراه نام کتاب مرجع و رنگ بنفش شاهانه به صورت خودکار و مستقل درج می‌کند. موتور پایپ‌لاین به تابع پالایش خودکار (`sanitize_ref_note`) مجهز است تا در صورت تزریق سهوی پیشوند، آن را به طور خودکار بزداید و از پدیده تکرار دوگانه تیتر (Dual Prepending) پیشگیری کند.
 
 2. **Strict Unvoiced & Skipped Slide Protocol:**
    - If the professor skips Page N without speaking about it:

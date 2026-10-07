@@ -37,7 +37,8 @@ from text_utils import (
     validate_cross_reference,
     normalize_for_matching,
     PERSIAN_PHARMA_INTERVENTIONS,
-    evaluate_concept_overlap
+    evaluate_concept_overlap,
+    has_ref_note_prefix
 )
 
 # Clause markers that indicate full English prose/sentences inside parentheses
@@ -1249,6 +1250,20 @@ def main():
                 })
 
         if ref_note:
+            if has_ref_note_prefix(ref_note):
+                warn_msg = (
+                    f"DUPLICATE REF TITLE ADVISORY at Slide {num}: 'ref_note' contains a redundant "
+                    f"lead title or emoji prefix (e.g., '💡 شرح تکمیلی...'). Word compiler will "
+                    f"automatically sanitize this to prevent dual prepending in DOCX."
+                )
+                warnings.append(warn_msg)
+                diagnostics["warnings"].append({
+                    "warning_type": "DUPLICATE_REF_TITLE_PREFIX",
+                    "slide_number": num,
+                    "message": warn_msg,
+                    "remediation_action": "Omit lead title and emoji from 'ref_note' in JSON; Word compiler prepends royal purple header automatically."
+                })
+
             ref_tokens = extract_tokens([ref_note])
             substantive_ref_tokens = {t for t in ref_tokens if len(t) >= 3 or (len(t) >= 2 and any(c.isupper() for c in t))}
             
