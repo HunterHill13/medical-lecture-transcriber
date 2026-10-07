@@ -1,11 +1,11 @@
-# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.6.0)
+# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.7.0)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/Tests-124%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-128%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-5.6.0-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/Version-5.7.0-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Google%20Antigravity-Compatible-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -73,8 +73,14 @@ Prevents translation shortcuts and visual pollution:
 * **Standalone Figure Extraction (`slide_NN_fig.png`):** For mixed slides featuring both text and clinical diagrams/flowcharts, extracts the pure graphical asset directly from the PDF/PPTX container.
 * **Smart Text Slide Screenshot Guard:** In the Word compiler, prioritizes standalone figures over whole-page screenshots, and strictly suppresses redundant full-page English screenshots on slides that only contain text bullets.
 
-### 13. 🧪 124-Test Automated Quality Suite
-* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, reference note sanitization, standalone figure extraction, and schema integrity.
+### 13. 🔢 Slide Numerical & Statistical Preservation Engine & Text Sanitizer (`SLIDE_NUMERICAL_DATA_OMISSION`)
+* **Verbatim Quantitative Metric Preservation:** Strictly enforces that epidemiological ratios (`5 in 10,000`, `3 in 10,000`), percentages (`0.5–2%`, `2–5%`), numerical ranges, cohort ages (`40-year-olds`), and drug dosages on presentation slides are preserved verbatim in translated bullets rather than generalized into vague qualitative prose.
+* **Anti-Track-Leakage Principle:** Ensures that detailed verbal explanations of statistics by the lecturer in Track 1 cannot be used to justify omitting or simplifying numbers in Track 2 slide boxes.
+* **Presentation Text Encoding Recovery (`sanitize_presentation_text`):** Automatically recovers and normalizes corrupted character encodings (e.g. `\ufffd` in ranges like `2\ufffd5%` to `2-5%`), unicode en/em-dashes, and smart quotes across PowerPoint and PDF extractions.
+* **Anti-Gaming Token Denominator:** Expands `ENGLISH_PROSE_STOPWORDS` with non-specific prose words (`countries`, `origin`, `frequent`, `population`, `society`) to prevent models from artificially inflating substantive recall by echoing general nouns in parentheses.
+
+### 14. 🧪 128-Test Automated Quality Suite
+* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, reference note sanitization, standalone figure extraction, numerical & statistical data preservation, and schema integrity.
 
 ---
 

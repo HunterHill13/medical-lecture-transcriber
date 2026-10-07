@@ -20,6 +20,12 @@ if sys.stdout.encoding != 'utf-8':
     except Exception:
         pass
 
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
+
+from text_utils import sanitize_presentation_text
+
 _OCR_ENGINE = None
 
 def get_ocr_engine():
@@ -256,7 +262,7 @@ def extract_pptx(pptx_path, img_dir=None):
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for p in shape.text_frame.paragraphs:
-                    t = p.text.strip()
+                    t = sanitize_presentation_text(p.text.strip())
                     if t:
                         text_lines.append(t)
                         if not title and len(t) < 120 and not t.startswith("•"):
@@ -264,7 +270,7 @@ def extract_pptx(pptx_path, img_dir=None):
             if shape.has_table:
                 has_tables = True
                 for row in shape.table.rows:
-                    row_txt = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+                    row_txt = [sanitize_presentation_text(cell.text.strip().replace("\n", " ")) for cell in row.cells]
                     text_lines.append(" | ".join(row_txt))
             if getattr(shape, "has_chart", False):
                 has_charts = True
@@ -414,7 +420,7 @@ def extract_pdf(pdf_path, img_dir=None):
     for idx, page in enumerate(doc):
         slide_num = idx + 1
         text = page.get_text()
-        raw_lines = [line.strip() for line in text.split("\n") if line.strip()]
+        raw_lines = [sanitize_presentation_text(line.strip()) for line in text.split("\n") if line.strip()]
         
         total_chars = sum(len(line) for line in raw_lines)
         total_words = sum(len(line.split()) for line in raw_lines)

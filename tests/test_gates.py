@@ -1939,6 +1939,164 @@ def test_duplicate_ref_title_prefix_triggers_non_blocking_advisory_and_auto_sani
     assert "قشر غده فوق‌کلیوی از سه رده هورمونی" in p_text
 
 
+def test_sanitize_presentation_text_encodings_and_dashes():
+    """Verifies that sanitize_presentation_text resolves \ufffd in ranges, unicode dashes, and smart quotes."""
+    from text_utils import sanitize_presentation_text
+
+    raw1 = "prevalence of 2\ufffd5% in general population"
+    clean1 = sanitize_presentation_text(raw1)
+    assert clean1 == "prevalence of 2-5% in general population"
+
+    raw2 = "adrenal \ufffdincidentalomas,\ufffd are common"
+    clean2 = sanitize_presentation_text(raw2)
+    assert clean2 == 'adrenal "incidentalomas," are common'
+
+    raw3 = "range: 0.5–2% with en–dash and em—dash and minus − sign"
+    clean3 = sanitize_presentation_text(raw3)
+    assert "0.5-2%" in clean3
+    assert "en-dash" in clean3
+    assert "em-dash" in clean3
+    assert "minus - sign" in clean3
+
+    raw4 = "quote ‘single’ and “double”"
+    clean4 = sanitize_presentation_text(raw4)
+    assert clean4 == 'quote \'single\' and "double"'
+
+
+def test_extract_clinical_facts_ratios_and_cohort_ages():
+    """Verifies extraction of epidemiological ratios, cohort ages, ranges, and percentages in English and Persian."""
+    from text_utils import extract_clinical_facts
+
+    en_text = (
+        "Permanent adrenal insufficiency: 5 in 10,000 in general population. "
+        "Hypothalamic-pituitary origin: 3 in 10,000. Primary: 2 in 10,000. "
+        "Exogenous glucocorticoid treatment: 0.5–2% of population. "
+        "Prevalence increases with age: 1% of 40-year-olds and 7% of 70-year-olds."
+    )
+    en_facts = extract_clinical_facts(en_text)
+    assert "5 in 10000" in en_facts["ratios"]
+    assert "3 in 10000" in en_facts["ratios"]
+    assert "2 in 10000" in en_facts["ratios"]
+    assert "2%" in en_facts["percentages"]
+    assert "1%" in en_facts["percentages"]
+    assert "7%" in en_facts["percentages"]
+    assert "0.5-2" in en_facts["ranges"]
+    assert "40 y/o" in en_facts["cohort_ages"]
+    assert "70 y/o" in en_facts["cohort_ages"]
+
+    fa_text = (
+        "شیوع نارسایی دائمی آدرنال ۵ در ۱۰،۰۰۰ نفر است. "
+        "منشأ هیپوتالاموس-هیپوفیز ۳ در ۱۰،۰۰۰ و اولیه ۲ در ۱۰،۰۰۰ است. "
+        "شیوع کورتون اگزوژن ۰.۵ تا ۲ درصد می‌باشد. "
+        "۱ درصد افراد ۴۰ ساله و ۷ درصد افراد ۷۰ ساله توده آدرنال دارند."
+    )
+    fa_facts = extract_clinical_facts(fa_text)
+    assert "5 in 10000" in fa_facts["ratios"]
+    assert "3 in 10000" in fa_facts["ratios"]
+    assert "2 in 10000" in fa_facts["ratios"]
+    assert "2%" in fa_facts["percentages"]
+    assert "1%" in fa_facts["percentages"]
+    assert "7%" in fa_facts["percentages"]
+    assert "0.5-2" in fa_facts["ranges"]
+    assert "40 y/o" in fa_facts["cohort_ages"]
+    assert "70 y/o" in fa_facts["cohort_ages"]
+
+
+def test_slide_numerical_data_omission_fails_when_statistics_dropped():
+    """
+    Verifies that when a slide contains critical epidemiological ratios and percentages
+    (e.g., Slide 8 with '5 in 10,000' and '0.5-2%'), but the translation omits them into
+    loose qualitative descriptions, the SLIDE_NUMERICAL_DATA_OMISSION gate halts with an error.
+    """
+    from verify_slide_alignment import check_slide_pair
+
+    raw_slide_8 = {
+        "slide_number": 8,
+        "title_raw": "Epidemiology of adrenal insufficiency",
+        "text_lines": [
+            "Epidemiology of adrenal insufficiency",
+            "Permanent adrenal insufficiency: 5 in 10,000 in general population",
+            "Hypothalamic-pituitary origin: 3 in 10,000",
+            "Primary adrenal insufficiency: 2 in 10,000",
+            "Adrenal insufficiency secondary to suppression of HPA axis due to exogenous glucocorticoid treatment is much more common: 0.5-2% of population in developed countries"
+        ]
+    }
+
+    # Deficient translation that dropped the ratios and percentages
+    trans_deficient_8 = {
+        "slide_number": 8,
+        "title_fa": "اپیدمیولوژی نارسایی آدرنال",
+        "title_en": "Epidemiology of adrenal insufficiency",
+        "bullets": [
+            {
+                "lead": "شیوع بیماری:",
+                "text": "نارسایی دائمی آدرنال در جمعیت عمومی شایع است."
+            },
+            {
+                "lead": "منشأ بیماری:",
+                "text": "منشأ هیپوتالاموس-هیپوفیز شایع‌تر از نارسایی اولیه آدرنال است."
+            },
+            {
+                "lead": "مصرف گلوکوکورتیکوئید:",
+                "text": "نارسایی ناشی از مصرف کورتون اگزوژن در کشورهای توسعه‌یافته بسیار شایع‌تر رخ می‌دهد."
+            }
+        ]
+    }
+
+    issues = check_slide_pair(raw_slide_8, trans_deficient_8)
+    num_omission_issues = [i for i in issues if i.get("type") == "SLIDE_NUMERICAL_DATA_OMISSION"]
+    assert len(num_omission_issues) == 1
+    iss = num_omission_issues[0]
+    assert iss["severity"] == "error"
+    assert "Ratio: 5 in 10000" in iss["omitted_data"]
+    assert "Percentage: 2%" in iss["omitted_data"] or "Range: 0.5-2" in iss["omitted_data"]
+
+
+def test_slide_numerical_data_omission_passes_when_statistics_preserved():
+    """
+    Verifies that when epidemiological ratios, ranges, and percentages are faithfully
+    preserved in Persian translation, the slide passes with 0 SLIDE_NUMERICAL_DATA_OMISSION errors.
+    """
+    from verify_slide_alignment import check_slide_pair
+
+    raw_slide_8 = {
+        "slide_number": 8,
+        "title_raw": "Epidemiology of adrenal insufficiency",
+        "text_lines": [
+            "Epidemiology of adrenal insufficiency",
+            "Permanent adrenal insufficiency: 5 in 10,000 in general population",
+            "Hypothalamic-pituitary origin: 3 in 10,000",
+            "Primary adrenal insufficiency: 2 in 10,000",
+            "Adrenal insufficiency secondary to suppression of HPA axis due to exogenous glucocorticoid treatment is much more common: 0.5-2% of population in developed countries"
+        ]
+    }
+
+    trans_faithful_8 = {
+        "slide_number": 8,
+        "title_fa": "اپیدمیولوژی نارسایی آدرنال",
+        "title_en": "Epidemiology of adrenal insufficiency",
+        "bullets": [
+            {
+                "lead": "شیوع کلی نارسایی دائمی آدرنال:",
+                "text": "شیوع نارسایی دائمی و اثبات‌شده آدرنال در جمعیت عمومی ۵ در ۱۰،۰۰۰ نفر (5 in 10,000) است."
+            },
+            {
+                "lead": "منشأ هیپوتالاموس-هیپوفیز در برابر اولیه:",
+                "text": "منشأ هیپوتالاموس-هیپوفیز با شیوع ۳ در ۱۰،۰۰۰ نفر (3 in 10,000) شایع‌ترین حالت است؛ در حالی که نارسایی اولیه آدرنال شیوع ۲ در ۱۰،۰۰۰ نفر (2 in 10,000) دارد."
+            },
+            {
+                "lead": "سرکوب محور با کورتون اگزوژن:",
+                "text": "نارسایی آدرنال ناشی از سرکوب محور HPA در نتیجه درمان با گلوکوکورتیکوئید اگزوژن بسیار شایع‌تر بوده و در ۰.۵ تا ۲ درصد (0.5–2%) از جمعیت کشورهای توسعه‌یافته رخ می‌دهد."
+            }
+        ]
+    }
+
+    issues = check_slide_pair(raw_slide_8, trans_faithful_8)
+    errors = [i for i in issues if i.get("severity") == "error"]
+    assert len(errors) == 0, f"Expected 0 errors for faithful Slide 8, got: {errors}"
+
+
+
 
 
 

@@ -91,6 +91,43 @@ def normalize_for_display(text: str) -> str:
     text = re.sub(r'[ \t]+', ' ', text)
     return text.strip()
 
+def sanitize_presentation_text(text: str) -> str:
+    """
+    Sanitizes presentation text from PPTX/PDF extraction:
+    - Normalizes replacement character \ufffd in numeric ranges (e.g. 2\ufffd5% -> 2-5%)
+    - Unifies Unicode dashes (en-dash, em-dash, non-breaking hyphen, minus sign) to standard '-'
+    - Unifies curly/smart quotes to standard quotes
+    - Strips non-breaking spaces (\u00a0) and stray replacement characters
+    """
+    if not text:
+        return ""
+    # 1. Normalize non-breaking space
+    t = str(text).replace('\u00a0', ' ')
+    
+    # 2. Convert Unicode dashes to standard hyphen
+    # \u2010 (hyphen), \u2011 (non-breaking hyphen), \u2012 (figure dash),
+    # \u2013 (en dash), \u2014 (em dash), \u2015 (horizontal bar), \u2212 (minus sign)
+    t = re.sub(r'[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]', '-', t)
+    
+    # 3. Contextual replacement of \ufffd between digits or digit and %
+    t = re.sub(r'(?<=\d)\s*[\ufffd]\s*(?=\d)', '-', t)
+    t = re.sub(r'(?<=\d)\s*[\ufffd]\s*(?=%)', '-', t)
+    
+    # 4. Curly/smart quotes
+    t = re.sub(r'[\u2018\u2019\u201b\u2032]', "'", t)
+    t = re.sub(r'[\u201c\u201d\u201f\u2033«»]', '"', t)
+    
+    # 5. Replacement character acting as quote around words (e.g. \ufffdincidentalomas\ufffd)
+    t = re.sub(r'[\ufffd](?=[A-Za-z\u0600-\u06FF])', '"', t)
+    t = re.sub(r'(?<=[A-Za-z\u0600-\u06FF,])[\ufffd]', '"', t)
+    
+    # 6. Any remaining \ufffd stripped
+    t = t.replace('\ufffd', '')
+    
+    # Collapse multiple spaces
+    t = re.sub(r'[ \t]+', ' ', t)
+    return t.strip()
+
 def normalize_for_matching(text: str) -> str:
     """
     Normalizes text for alignment matching and lexical recall:
@@ -103,6 +140,7 @@ def normalize_for_matching(text: str) -> str:
     """
     if not text:
         return ""
+    text = sanitize_presentation_text(text)
     for src, dst in MATCHING_CHAR_REPLACEMENTS.items():
         text = text.replace(src, dst)
     text = text.translate(COMBINED_DIGITS)
@@ -829,7 +867,10 @@ ENGLISH_PROSE_STOPWORDS = {
     "step", "steps", "stage", "stages", "phase", "phases",
     "rate", "rates", "ratio", "ratios", "amount", "amounts", "number", "numbers",
     "source", "sources", "target", "targets", "area", "areas", "part", "parts",
-    "time", "times", "period", "periods", "day", "days", "week", "weeks", "month", "months", "year", "years"
+    "time", "times", "period", "periods", "day", "days", "week", "weeks", "month", "months", "year", "years",
+    "country", "countries", "origin", "origins", "frequent", "frequently", "frequency",
+    "population", "populations", "society", "societies", "world", "developed", "developing",
+    "decade", "decades", "century", "centuries", "prevalence", "permanent", "transient"
 }
 
 def extract_substantive_tokens(text_or_lines: Union[str, List[str]], max_stem_len: Optional[int] = None) -> Set[str]:
@@ -1023,10 +1064,11 @@ def validate_cross_reference(cross_ref_entry: Union[dict, str], current_slide_nu
 def extract_clinical_facts(text: str) -> dict:
     """
     Extracts structured clinical facts:
-    - percentages (e.g. 7%, 10%, ۱۰٪, ۷ درصد)
+    - percentages (e.g. 7%, 10%, ۱۰٪, ۷ درصد, 0.5-2%)
     - dosages & medical quantities (e.g. 25 mg, 500mg, 10 mcg, 2 gr)
     - lab values & vitals (e.g. 120/80 mmHg, 120 mmHg, 37 C, 5.5 mmol/L)
-    - numeric ranges (e.g. 5-10, 5 الی 10, 2 تا 4)
+    - numeric ranges (e.g. 5-10, 5 الی 10, 2 تا 4, 0.5-2)
+    - epidemiological ratios & prevalences (e.g. 5 in 10000, 3 in 10000, 2 in 10000, 5 در 10000)
     - significant clinical numbers (>= 2 digits)
     """
     if not text:
@@ -1035,10 +1077,16 @@ def extract_clinical_facts(text: str) -> dict:
             "dosages": set(),
             "lab_values": set(),
             "ranges": set(),
+            "ratios": set(),
             "numbers": set()
         }
         
-    norm_text = text.translate(COMBINED_DIGITS).lower()
+    norm_text = sanitize_presentation_text(str(text))
+    norm_text = norm_text.translate(COMBINED_DIGITS).lower()
+    # Normalize digit-grouping commas (10,000 or 10،000 -> 10000)
+    norm_text = re.sub(r'(?<=\d)[,\u060C](?=\d{3}(?!\d))', '', norm_text)
+    # Convert 'هزار' to '000' after digits (e.g. 10 هزار -> 10000)
+    norm_text = re.sub(r'(\d+)\s*هزار', r'\g<1>000', norm_text)
     
     # 1. Percentages
     pct_matches = re.findall(r'(\d+(?:\.\d+)?)\s*(?:%|٪|درصد)', norm_text)
@@ -1080,12 +1128,25 @@ def extract_clinical_facts(text: str) -> dict:
         else:
             lab_values.add(f"{val} {unit}")
             
-    # 4. Numeric clinical ranges (e.g. 5-10, 5 الی 10, 2 تا 4)
+    # 4. Numeric clinical ranges (e.g. 5-10, 5 الی 10, 2 تا 4, 0.5-2)
     range_matches = re.findall(r'(?<!\w)(\d+(?:\.\d+)?)\s*(?:-|الی|تا)\s*(\d+(?:\.\d+)?)(?!\w)', norm_text)
     ranges = {f"{r1}-{r2}" for r1, r2 in range_matches if r1 != r2}
+
+    # 5. Epidemiological ratios & prevalences (e.g. 5 in 10000, 3 in 10000, 2 in 10000, 1 in 100)
+    ratio_pattern = r'(\d+(?:\.\d+)?)\s*(?:in|per|در|از|مورد در)\s*(?:هر\s*)?(\d{2,7})'
+    ratios = set()
+    for num, denom in re.findall(ratio_pattern, norm_text):
+        ratios.add(f"{num} in {denom}")
+
+    # 6. Cohort ages (e.g. 40-year-olds, 70 ساله, 40 سال)
+    cohort_pattern = r'(?<![A-Za-z0-9])(\d{1,3})\s*(?:-|–|—)?\s*(?:year[\s\-]*olds?|سالگی|ساله|سال)(?![A-Za-z0-9])'
+    cohort_ages = {f"{m} y/o" for m in re.findall(cohort_pattern, norm_text)}
     
-    # 5. Significant clinical numbers (two or more digits)
-    num_matches = re.findall(r'(?<![\w\.\-])(\d{2,5})(?![\w\.\-])', norm_text)
+    # 7. Significant epidemiological / population counts (>= 3 digits, e.g. 10000, 500)
+    # Strictly exclude chemical formulas like 1,25(OH)2D, receptor notations, or hyphenated compounds
+    clean_for_nums = re.sub(r'\d+,\d+\s*\([^\)]*\)[A-Za-z0-9]*', ' ', norm_text)
+    clean_for_nums = re.sub(r'[A-Za-z0-9α-ωΑ-Ω²³⁺⁻₀-₉]+[-/][A-Za-z0-9α-ωΑ-Ω²³⁺⁻₀-₉]+', ' ', clean_for_nums)
+    num_matches = re.findall(r'(?<![\w\.\-,/])(\d{3,7})(?![\w\.\-,/])', clean_for_nums)
     numbers = set(num_matches)
     
     return {
@@ -1093,6 +1154,8 @@ def extract_clinical_facts(text: str) -> dict:
         "dosages": dosages,
         "lab_values": lab_values,
         "ranges": ranges,
+        "ratios": ratios,
+        "cohort_ages": cohort_ages,
         "numbers": numbers
     }
 
@@ -1101,7 +1164,7 @@ def compare_clinical_facts(audio_facts: dict, slide_facts: dict) -> dict:
     Compares clinical facts extracted from audio segments against slide spoken lecture.
     Distinguishes two tiers of omissions:
     1. Critical omissions: drug dosages and vital lab values (triggers hard ERROR in verifier)
-    2. Advisory omissions: percentages, numeric ranges, clinical numbers (triggers WARNING in verifier)
+    2. Advisory omissions: percentages, numeric ranges, clinical ratios, numbers (triggers WARNING in verifier)
     Returns comparison metrics and partitioned omission lists.
     """
     critical_omissions = []
@@ -1115,18 +1178,19 @@ def compare_clinical_facts(audio_facts: dict, slide_facts: dict) -> dict:
         for item in sorted(missing):
             critical_omissions.append(f"{cat.rstrip('s')}: {item}")
             
-    # 2. Advisory categories (Percentages, ranges, numbers)
-    for cat in ("percentages", "ranges", "numbers"):
+    # 2. Advisory categories (Percentages, ranges, ratios, numbers)
+    for cat in ("percentages", "ranges", "ratios", "numbers"):
         aud_set = audio_facts.get(cat, set())
         sld_set = slide_facts.get(cat, set())
         missing = aud_set - sld_set
         for item in sorted(missing):
+            critical_omissions_or_advisory = item if cat != "ratios" else f"ratio: {item}"
             advisory_omissions.append(f"{cat.rstrip('s')}: {item}")
             
     all_omissions = critical_omissions + advisory_omissions
     
-    total_audio_facts = sum(len(audio_facts.get(k, set())) for k in ("dosages", "lab_values", "percentages", "ranges", "numbers"))
-    total_slide_facts = sum(len(slide_facts.get(k, set())) for k in ("dosages", "lab_values", "percentages", "ranges", "numbers"))
+    total_audio_facts = sum(len(audio_facts.get(k, set())) for k in ("dosages", "lab_values", "percentages", "ranges", "ratios", "numbers"))
+    total_slide_facts = sum(len(slide_facts.get(k, set())) for k in ("dosages", "lab_values", "percentages", "ranges", "ratios", "numbers"))
     
     fact_recall = 1.0
     if total_audio_facts > 0:

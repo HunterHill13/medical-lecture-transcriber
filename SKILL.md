@@ -1,23 +1,26 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.6.0): enforces Smart Visual Asset Classifier
-  & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure clinical
-  diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English
-  screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic
-  cell-by-cell table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric
-  memory hallucination of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
+  Publication-grade medical study guide and lecture transcription workflow (v5.7.0): enforces Slide Numerical & Statistical
+  Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological ratios like '5 in 10,000',
+  statistical percentages like '0.5-2%', ranges, and cohort ages without qualitative generalization), Presentation Text Sanitization & Encoding
+  Recovery Engine (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF extraction), Smart Visual
+  Asset Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure clinical
+  diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English screenshots
+  on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table
+  row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination
+  of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
   UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Universal Reference Note Sanitization &
   Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator Filtering
-  (filters routine English prose verbs and fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF,
-  SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate
+  (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF,
+  EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate
   (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads), Track 3 Reference
-  Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping
-  (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering, Automated
-  124-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping (validates line
+  citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering, Automated 128-Test Suite in tests/,
+  and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.6.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.7.0)
 
 ## Overview
 
@@ -585,6 +588,12 @@ uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations 
      - خطای قطعی `INCOMPLETE_TABLE_TRANSCRIPTION` (سطح شدت `error`): چنانچه جدول ترجمه‌شده فاقد ردیف باشد (`len(rows) == 0`) یا بازخوانی مفاهیم ماهوی آن از ۵۰٪ کمتر باشد (نشان‌دهنده جاافتادن ردیف‌های بالینی نظیر مسمومیت با آلومینیوم)، خطای سخت مسدودکننده صادر شده و مدل ملزم به تکمیل سطر به سطر جدول می‌گردد.
    - **پوشش سلولی در موتور ارزیابی توکن‌ها:** کلیه متون موجود در `headers` و تمام سلول‌های `rows` جدول به صورت خودکار در متغیر ارزیابی مفاهیم (`trans_searchable` و `trans_tokens`) لحاظ می‌شوند تا هیچ واژه تخصصی جدولی از قلم نیفتد.
 
+9. **گیت حفظ داده‌های آماری و عددی اسلایدها (`SLIDE_NUMERICAL_DATA_OMISSION`):**
+   - **الزام قطعی به حفظ اعداد و آمارهای کمّی (Quantitative Verbatim Rule):** در اسلایدهای اپیدمیولوژی، تشخیصی و درمانی، مدل اکیداً حق تبدیل داده‌های آماری دقیق (نظیر نسبت‌های شیوع `5 in 10,000` یا `3 in 10,000`، درصدها و بازه‌ها مانند `0.5–2%` یا `2–5%`، آمار کوهورت مانند `1% of 40-year-olds`) به عبارات کلی و کیفی (نظیر «شیوع بالاست» یا «اکثریت موارد») را ندارد.
+   - **ممنوعیت نشست محتوای اسلاید به ویس (Anti-Track Leakage):** حتی اگر استاد در فایل صوتی (Track 1) این اعداد و نسبت‌ها را با شرح کامل توضیح داده باشد، کادر ترجمه اسلاید (Track 2) موظف است تمامی ارقام و داده‌های آماری اسلاید را عیناً و با وفاداری کامل به فارسی ترجمه و ثبت کند.
+   - **پالایش خودکار انکودینگ و کاراکترهای خراب (`sanitize_presentation_text`):** سیستم در دو لایه استخراج و ارزیابی، خرابی‌های ناشی از فونت‌های قدیمی و تبدیل انکودینگ (نظیر `\ufffd` در بازه‌ها مانند `2\ufffd5%` به `2-5%`، خط تیره‌های یونیکد en-dash و em-dash و گیومه‌های فانتزی) را به صورت خودکار پالایش و استانداردسازی می‌کند.
+   - **صدور خطای سخت مسدودکننده:** چنانچه هرگونه نسبت آماری، درصد، بازه عددی یا دوز دارویی از اسلاید اصلی در ترجمه بولت‌ها یا جدول حذف شود، گیت `verify_slide_alignment.py` بلافاصله خطای سخت `SLIDE_NUMERICAL_DATA_OMISSION` صادر کرده و مانع از ساخت جزوه ناقص می‌گردد.
+
 ---
 
 ## 💻 3. COMPLETE REFERENCE PYTHON IMPLEMENTATION (COPY-PASTE READY)
@@ -1122,7 +1131,7 @@ Before concluding any study guide generation task, the agent **MUST** verify eac
 
 - [ ] **Dual-Engine Presentation Extraction Executed:** Extracted all slides from PPTX or PDF into `raw_slides.json` using `scripts/extract_presentation.py` (with visual-aware ONNX OCR triggered on any slide bearing visual images, charts, smartart, or PDF tables, robust confidence thresholding >= 0.60, and native vs. scanned table differentiation).
 - [ ] **Strict Page Index Invariance Verified:** Slide Box N strictly corresponds to Presentation Page N across all 1 to total_pages. Zero dropped or merged slides.
-- [ ] **Automated Slide Alignment Gate Passed:** `scripts/verify_slide_alignment.py` executed and passed with exit code 0 (mandatory >= 50% substantive recall rate on raw tokens >= 4, Source Exclusivity gate preventing ungrounded textbook/drug injections into Track 2, zero false phantom hallucination, and strict slide text immutability without audio/reference leakage).
+- [ ] **Automated Slide Alignment Gate Passed:** `scripts/verify_slide_alignment.py` executed and passed with exit code 0 (mandatory >= 50% substantive recall rate on raw tokens >= 4, Slide Numerical & Statistical Data Preservation Gate strictly enforcing epidemiological numbers, ratios, and percentages, Source Exclusivity gate preventing ungrounded textbook/drug injections into Track 2, zero false phantom hallucination, and strict slide text immutability without audio/reference leakage).
 - [ ] **Substantive Audio & Concept Coverage Gate Passed:** `scripts/verify_lecture_alignment.py` executed and passed with exit code 0, verifying chronology, duration bounds, keyword matching, and clinical substance density.
 - [ ] **Safe Auto-Remediation & Fallback Badging Verified:** Auto-fix restricted to deterministic structural issues (no silent clamping for drifts > 3 min); unresolved cases flagged with amber Student Review Badges.
 - [ ] **Tri-Partite Provenance Attribution Verified:** Strict separation between spoken lecture (Track 1), literal slide translation (Track 2), and unvoiced reference commentary (Track 3).

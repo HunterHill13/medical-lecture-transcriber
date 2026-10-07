@@ -38,7 +38,10 @@ from text_utils import (
     normalize_for_matching,
     PERSIAN_PHARMA_INTERVENTIONS,
     evaluate_concept_overlap,
-    has_ref_note_prefix
+    has_ref_note_prefix,
+    extract_clinical_facts,
+    COMBINED_DIGITS,
+    sanitize_presentation_text
 )
 
 # Clause markers that indicate full English prose/sentences inside parentheses
@@ -736,6 +739,73 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                                     f"Uncovered table concepts: {missing_concepts}"),
                         "remediation_action": "Translate 100% of rows, subcategories, and parenthetical items in table_data without omitting clinical details."
                     })
+
+        # Check 3.3.0.1: Slide Numerical & Statistical Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION)
+        # Mandates that quantitative clinical/statistical metrics (percentages, numerical ranges,
+        # epidemiological ratios such as '5 in 10,000' or '0.5-2%', dosages, and lab measurements)
+        # present in the raw presentation slide MUST be preserved in the translated slide bullets or tables.
+        if not ceremonial and not is_pure_visual and raw_tokens:
+            raw_combined_text = " ".join(raw_lines + ocr_lines)
+            raw_facts = extract_clinical_facts(raw_combined_text)
+            trans_combined_text = " ".join(trans_bullet_texts + trans_table_texts)
+            trans_facts = extract_clinical_facts(trans_combined_text)
+
+            omitted_critical_data = []
+
+            # 1. Epidemiological Ratios & Prevalences (e.g. 5 in 10000, 3 in 10000, 2 in 10000)
+            missing_ratios = raw_facts.get("ratios", set()) - trans_facts.get("ratios", set())
+            for r in sorted(missing_ratios):
+                omitted_critical_data.append(f"Ratio: {r}")
+
+            # 2. Percentages (e.g. 2%, 7%, 80%)
+            missing_pcts = raw_facts.get("percentages", set()) - trans_facts.get("percentages", set())
+            for p in sorted(missing_pcts):
+                omitted_critical_data.append(f"Percentage: {p}")
+
+            # 3. Numeric Ranges (e.g. 0.5-2, 2-5, 1-7)
+            missing_ranges = raw_facts.get("ranges", set()) - trans_facts.get("ranges", set())
+            for rng in sorted(missing_ranges):
+                omitted_critical_data.append(f"Range: {rng}")
+
+            # 4. Dosages & Lab values
+            for cat in ("dosages", "lab_values"):
+                missing_items = raw_facts.get(cat, set()) - trans_facts.get(cat, set())
+                for it in sorted(missing_items):
+                    omitted_critical_data.append(f"{cat.rstrip('s')}: {it}")
+
+            # 5. Cohort Ages (e.g. 40 y/o, 70 y/o)
+            missing_ages = raw_facts.get("cohort_ages", set()) - trans_facts.get("cohort_ages", set())
+            for a in sorted(missing_ages):
+                omitted_critical_data.append(f"Cohort Age: {a}")
+
+            # 6. Significant Population Numbers (>= 3 digits) not covered by matched ratios/percentages/ranges
+            raw_nums = raw_facts.get("numbers", set())
+            trans_nums = trans_facts.get("numbers", set())
+            missing_nums = raw_nums - trans_nums
+            matched_trans_all_digits = set(re.findall(r'\d+', sanitize_presentation_text(trans_combined_text).translate(COMBINED_DIGITS)))
+            strictly_missing_nums = {n for n in missing_nums if n not in matched_trans_all_digits}
+            for n in sorted(strictly_missing_nums):
+                omitted_critical_data.append(f"Population Count: {n}")
+
+            is_student_review = bool(trans_item.get("needs_student_review", False))
+            if omitted_critical_data and not is_student_review:
+                omission_str = ", ".join(omitted_critical_data[:6])
+                if len(omitted_critical_data) > 6:
+                    omission_str += f" (+{len(omitted_critical_data) - 6} more)"
+                err_msg = (
+                    f"SLIDE NUMERICAL DATA OMISSION at Slide {num}: Raw slide contains quantitative/statistical data "
+                    f"({omission_str}) that was omitted or generalized in translated bullets! "
+                    f"Medical study guides strictly require faithful preservation of epidemiological numbers, percentages, and clinical ratios."
+                )
+                issues.append({
+                    "type": "SLIDE_NUMERICAL_DATA_OMISSION",
+                    "error_type": "SLIDE_NUMERICAL_DATA_OMISSION",
+                    "severity": "error",
+                    "slide_number": num,
+                    "message": err_msg,
+                    "omitted_data": omitted_critical_data,
+                    "remediation_action": f"Incorporate the omitted quantitative data ({omission_str}) verbatim into Slide {num} translated bullets or table."
+                })
 
         # Check 3.3.1: Anti-Clause Parentheses Gate (Strict Parenthetical Entity Enforcement)
         # Strictly forbids copying full English sentences, clauses, or long descriptive phrases into parentheses.
