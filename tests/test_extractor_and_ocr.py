@@ -837,6 +837,149 @@ def test_detect_image_table_persian_guideline_table():
     assert is_table is True, "Expected detect_image_table to identify Persian table screenshot via keyword/numbering regex"
 
 
+def test_extract_pdf_filters_tiny_bullets_and_extracts_standalone_fig(tmp_path):
+    """
+    Verifies that extract_pdf:
+    1. Filters out tiny icons/bullets (< 150px) on slides with substantive text (has_images: False).
+    2. Identifies and extracts genuine standalone figures (w >= 150, h >= 150) as slide_NN_fig.png.
+    """
+    from PIL import Image
+    import io
+
+    pdf_path = str(tmp_path / "test_visual_filtering.pdf")
+    img_dir = str(tmp_path / "extracted_images")
+    os.makedirs(img_dir, exist_ok=True)
+
+    # Prepare tiny icon image (60x60)
+    tiny_img = Image.new("RGB", (60, 60), color="blue")
+    tiny_buf = io.BytesIO()
+    tiny_img.save(tiny_buf, format="PNG")
+    tiny_bytes = tiny_buf.getvalue()
+
+    # Prepare substantive diagram image (350x250)
+    fig_img = Image.new("RGB", (350, 250), color="green")
+    fig_buf = io.BytesIO()
+    fig_img.save(fig_buf, format="PNG")
+    fig_bytes = fig_buf.getvalue()
+
+    doc = pymupdf.open()
+
+    # Page 1: Substantive text + tiny bullet icon -> Should NOT be marked has_images: True
+    p1 = doc.new_page(width=720, height=540)
+    p1.insert_text((50, 50), "Adrenal Gland Regulation and Physiology\n- Zona glomerulosa secretes aldosterone\n- Zona fasciculata secretes cortisol\n- Zona reticularis secretes androgens\nClinical feedback loops maintain homeostasis.")
+    p1.insert_image(pymupdf.Rect(40, 60, 60, 80), stream=tiny_bytes)
+
+    # Page 2: Substantive text + genuine substantive diagram -> Should extract slide_02_fig.png
+    p2 = doc.new_page(width=720, height=540)
+    p2.insert_text((50, 50), "Hypothalamic-Pituitary-Adrenal Axis\n- CRH stimulates ACTH release\n- ACTH stimulates cortisol secretion from adrenal cortex\n- Negative feedback inhibits further secretion.")
+    p2.insert_image(pymupdf.Rect(350, 100, 650, 350), stream=fig_bytes)
+
+    doc.save(pdf_path)
+    doc.close()
+
+    slides = extract_pdf(pdf_path, img_dir=img_dir)
+    assert len(slides) == 2
+
+    # Slide 1: Tiny bullet icon filtered out
+    assert slides[0]["has_images"] is False, "Expected tiny 60x60 bullet icon to be filtered out of text slide"
+    assert slides[0]["has_standalone_figure"] is False
+
+    # Slide 2: Standalone figure recognized and extracted
+    assert slides[1]["has_images"] is True
+    assert slides[1]["has_standalone_figure"] is True
+    assert slides[1]["fig_path"] is not None
+    assert os.path.exists(slides[1]["fig_path"])
+    assert "slide_02_fig" in slides[1]["fig_path"]
+
+
+def test_find_and_prepare_slide_image_prioritizes_standalone_figure(tmp_path):
+    """
+    Verifies that find_and_prepare_slide_image prioritizes standalone figure files
+    (slide_05_fig.png) over full slide screenshots (slide_05.png).
+    """
+    from PIL import Image
+    from create_slide_pamphlet import find_and_prepare_slide_image
+
+    img_dir = str(tmp_path / "test_priority_imgs")
+    os.makedirs(img_dir, exist_ok=True)
+
+    screenshot_path = os.path.join(img_dir, "slide_05.png")
+    fig_path = os.path.join(img_dir, "slide_05_fig.png")
+
+    img_screen = Image.new("RGB", (720, 540), color="white")
+    img_screen.save(screenshot_path)
+
+    img_fig = Image.new("RGB", (300, 200), color="purple")
+    img_fig.save(fig_path)
+
+    chosen = find_and_prepare_slide_image(img_dir, 5)
+    assert chosen is not None
+    assert "slide_05_fig" in chosen, f"Expected standalone figure to be prioritized, but got: {chosen}"
+
+
+def test_smart_text_slide_screenshot_guard_suppresses_full_page_screenshot(tmp_path):
+    """
+    Verifies that build_pamphlet_from_json suppresses full-page screenshots
+    for pure text slides (>= 2 bullets, no tables/charts) while embedding
+    standalone figures when present on mixed slides.
+    """
+    import json
+    import docx
+    from PIL import Image
+    from create_slide_pamphlet import build_pamphlet_from_json
+
+    img_dir = str(tmp_path / "pamphlet_imgs")
+    os.makedirs(img_dir, exist_ok=True)
+
+    # Slide 4: Full page screenshot exists
+    img4 = Image.new("RGB", (720, 540), color="white")
+    img4.save(os.path.join(img_dir, "slide_04.png"))
+
+    # Slide 5: Standalone figure exists
+    img5 = Image.new("RGB", (300, 200), color="green")
+    img5.save(os.path.join(img_dir, "slide_05_fig.png"))
+
+    slides = [
+        {
+            "slide_number": 4,
+            "title_fa": "فیزیولوژی قشر فوق‌کلیوی",
+            "title_en": "Adrenal Cortex Physiology",
+            "bullets": [
+                {"lead": "هورمون‌های استروئیدی:", "body": "ترشح سه دسته هورمون گلوکوکورتیکوئید، مینرالوکورتیکوئید و آندروژن."},
+                {"lead": "تنظیم ترشح:", "body": "کنترل از طریق محور هیپوتالاموس-هیپوفیز و سیستم رنین-آنژیوتانسین."}
+            ]
+        },
+        {
+            "slide_number": 5,
+            "title_fa": "محور هیپوتالاموس-هیپوفیز-آدرنال",
+            "title_en": "HPA Axis Regulation",
+            "bullets": [
+                {"lead": "محرک ترشح:", "body": "هورمون CRH و ACTH سنتز کورتیزول را القا می‌کنند."},
+                {"lead": "فیدبک منفی:", "body": "کورتیزول بالا ترشح CRH و ACTH را مهار می‌نماید."}
+            ]
+        }
+    ]
+
+    json_path = tmp_path / "slides.json"
+    docx_path = tmp_path / "output.docx"
+    json_path.write_text(json.dumps(slides, ensure_ascii=False), encoding="utf-8")
+
+    build_pamphlet_from_json(str(json_path), str(docx_path), img_dir=img_dir)
+    doc = docx.Document(str(docx_path))
+
+    # Inspect slide boxes
+    slide_boxes = [t for t in doc.tables if len(t.rows) == 2 and "اسلاید مرتبط" in t.rows[0].cells[0].text]
+    assert len(slide_boxes) == 2
+
+    # Slide 4 is pure text -> full page screenshot slide_04.png MUST BE SUPPRESSED!
+    s4_xml = slide_boxes[0].rows[1].cells[0]._tc.xml
+    assert "<w:drawing" not in s4_xml, "Expected full-page screenshot to be suppressed on pure text slide 4"
+
+    # Slide 5 is mixed with standalone figure -> standalone figure slide_05_fig.png MUST BE EMBEDDED!
+    s5_xml = slide_boxes[1].rows[1].cells[0]._tc.xml
+    assert "<w:drawing" in s5_xml, "Expected standalone figure to be embedded in mixed slide 5"
+
+
 
 
 

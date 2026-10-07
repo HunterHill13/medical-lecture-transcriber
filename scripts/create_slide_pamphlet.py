@@ -111,32 +111,53 @@ def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
 
     return src_path
 
-def find_and_prepare_slide_image(img_dir: str, slide_num: int) -> str | None:
+def find_and_prepare_slide_image(img_dir: str, slide_num: int, only_standalone: bool = False) -> str | None:
     """
-    Dynamically searches img_dir for any candidate image representing slide_num,
-    converting vector/metafile images (WMF/EMF/SVG) to standard PNG if needed.
+    Dynamically searches img_dir for candidate images for slide_num.
+    Prioritizes standalone cropped figures/diagrams (e.g. slide_05_fig.png, extracted_figure_slide_5.png)
+    over full-page slide screenshots.
+    If only_standalone is True, full-page screenshots are skipped.
     """
     if not img_dir or not os.path.isdir(img_dir):
         return None
         
     exts = ("png", "jpg", "jpeg", "wmf", "emf", "webp", "tiff", "tif", "bmp", "svg")
-    patterns = [
-        f"slide_{slide_num:03d}",
-        f"slide_{slide_num:02d}",
-        f"slide_{slide_num}",
+    
+    # 1. Standalone figure patterns (HIGHEST PRIORITY)
+    standalone_patterns = [
+        f"slide_{slide_num:03d}_fig",
+        f"slide_{slide_num:02d}_fig",
+        f"slide_{slide_num}_fig",
+        f"slide_{slide_num:03d}_figure",
+        f"slide_{slide_num:02d}_figure",
+        f"slide_{slide_num}_figure",
+        f"extracted_figure_slide_{slide_num}",
         f"slide_{slide_num:03d}_img",
         f"slide_{slide_num:02d}_img",
-        f"slide_{slide_num}_img"
+        f"slide_{slide_num}_img",
     ]
-    
-    # 1. Exact priority matches
-    for pat in patterns:
+    for pat in standalone_patterns:
         for ext in exts:
             cand = os.path.join(img_dir, f"{pat}.{ext}")
             if os.path.exists(cand):
                 return convert_image_to_png(cand)
                 
-    # 2. Dynamic directory scan matching slide number prefix
+    if only_standalone:
+        return None
+
+    # 2. Full slide screenshot patterns (Fallback for visual/scanned/table slides)
+    screenshot_patterns = [
+        f"slide_{slide_num:03d}",
+        f"slide_{slide_num:02d}",
+        f"slide_{slide_num}"
+    ]
+    for pat in screenshot_patterns:
+        for ext in exts:
+            cand = os.path.join(img_dir, f"{pat}.{ext}")
+            if os.path.exists(cand):
+                return convert_image_to_png(cand)
+                
+    # 3. Dynamic directory scan matching slide number prefix
     try:
         files = sorted(os.listdir(img_dir))
         target_prefixes = (f"slide_{slide_num:02d}", f"slide_{slide_num:03d}", f"slide_{slide_num}_", f"slide_{slide_num}.")
@@ -1033,15 +1054,43 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
                 slide_augmented["has_image_table"] = True
             if raw_item.get("is_pure_visual") or raw_item.get("is_image_only"):
                 slide_augmented["is_pure_visual"] = True
-            if bool(slide_augmented.get("has_images") or slide_augmented.get("has_charts") or slide_augmented.get("has_smartart") or slide_augmented.get("has_tables") or slide_augmented.get("has_image_table") or slide_augmented.get("is_pure_visual")):
-                slide_augmented["is_visual"] = True
+            if raw_item.get("has_standalone_figure"):
+                slide_augmented["has_standalone_figure"] = True
 
-        img_path = slide_augmented.get("img_path") or raw_item.get("img_path")
-        if img_path and os.path.exists(img_path):
-            img_path = convert_image_to_png(img_path)
-        elif img_dir:
-            img_path = find_and_prepare_slide_image(img_dir, num)
-                
+        bullets = slide.get("bullets", [])
+        num_bullets = len(bullets)
+        has_table_content = bool(slide.get("table_data") or slide_augmented.get("has_tables") or slide_augmented.get("has_image_table"))
+        has_chart_content = bool(slide.get("has_charts") or slide_augmented.get("has_charts"))
+        is_pure_vis = bool(slide.get("is_pure_visual") or slide.get("is_image_only") or slide_augmented.get("is_pure_visual"))
+
+        # Smart Text Slide Screenshot Guard:
+        # A slide with substantive text (>= 2 bullets) without table/chart/pure-visual is pure text
+        is_text_heavy_slide = bool(num_bullets >= 2 and not has_table_content and not has_chart_content and not is_pure_vis)
+
+        # 1. Search for standalone figures first (e.g. slide_05_fig.png)
+        img_path = None
+        if img_dir:
+            img_path = find_and_prepare_slide_image(img_dir, num, only_standalone=True)
+            
+        # 2. If no standalone figure found:
+        if not img_path:
+            # Fall back to full-page screenshot ONLY if the slide is NOT a pure text slide
+            if not is_text_heavy_slide:
+                explicit_img = slide.get("img_path") or raw_item.get("img_path")
+                if explicit_img and os.path.exists(explicit_img):
+                    img_path = convert_image_to_png(explicit_img)
+                elif img_dir:
+                    img_path = find_and_prepare_slide_image(img_dir, num, only_standalone=False)
+            else:
+                # Pure text slide: suppress full English screenshot!
+                img_path = None
+                slide_augmented["has_images"] = False
+
+        if bool(img_path or slide_augmented.get("has_charts") or slide_augmented.get("has_smartart") or slide_augmented.get("has_tables") or slide_augmented.get("has_image_table") or slide_augmented.get("is_pure_visual")):
+            slide_augmented["is_visual"] = True
+        else:
+            slide_augmented["is_visual"] = False
+
         table_data = slide_augmented.get("table_data", None)
         add_slide_box_from_json(doc, slide_augmented, img_path=img_path, table_data=table_data, ref_book_name=ref_book)
         

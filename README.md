@@ -1,11 +1,11 @@
-# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.5.0)
+# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.6.0)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/Tests-121%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-124%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-5.5.0-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/Version-5.6.0-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Google%20Antigravity-Compatible-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -68,8 +68,13 @@ Prevents translation shortcuts and visual pollution:
 * Features a robust agnostic regex parser in `text_utils.py` that strips redundant emojis, phrases, book titles, and colons while preserving pure medical commentary.
 * Connects seamlessly with `verify_slide_alignment.py` to issue informative, non-blocking `DUPLICATE_REF_TITLE_PREFIX` advisories without halting pipeline execution.
 
-### 12. 🧪 121-Test Automated Quality Suite
-* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, reference note sanitization, and schema integrity.
+### 12. 🖼️ Smart Visual Asset Classifier & Standalone Figure Engine
+* **Multi-Criteria Asset Filtering:** Automatically identifies and discards tiny decorative icons, bullet graphics (< 150px or < 25,000 px²), and slide master template background wallpapers on text slides.
+* **Standalone Figure Extraction (`slide_NN_fig.png`):** For mixed slides featuring both text and clinical diagrams/flowcharts, extracts the pure graphical asset directly from the PDF/PPTX container.
+* **Smart Text Slide Screenshot Guard:** In the Word compiler, prioritizes standalone figures over whole-page screenshots, and strictly suppresses redundant full-page English screenshots on slides that only contain text bullets.
+
+### 13. 🧪 124-Test Automated Quality Suite
+* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, reference note sanitization, standalone figure extraction, and schema integrity.
 
 ---
 

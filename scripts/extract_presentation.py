@@ -248,6 +248,8 @@ def extract_pptx(pptx_path, img_dir=None):
         has_images = False
         has_charts = False
         has_smartart = False
+        has_standalone_figure = False
+        standalone_fig_path = None
         image_extraction_error = False
         
         # Check shapes
@@ -269,22 +271,44 @@ def extract_pptx(pptx_path, img_dir=None):
             if shape.shape_type == getattr(MSO_SHAPE_TYPE, "SMART_ART", 14):
                 has_smartart = True
             if shape.shape_type == MSO_SHAPE_TYPE.PICTURE or hasattr(shape, "image"):
-                has_images = True
-                if img_dir and not full_rendered and hasattr(shape, "image"):
+                # Multi-criteria filtering: skip tiny icons/bullets & full-slide template backgrounds behind text
+                img_w, img_h = 0, 0
+                if hasattr(shape, "image"):
                     try:
-                        img_bytes = shape.image.blob
-                        ext = shape.image.ext or "png"
-                        img_filename = f"slide_{slide_num:02d}_img.{ext}"
-                        img_path = os.path.join(img_dir, img_filename)
-                        if not os.path.exists(img_path):
-                            with open(img_path, "wb") as f_img:
-                                f_img.write(img_bytes)
-                        if ext.lower() != "png":
-                            png_target = os.path.join(img_dir, f"slide_{slide_num:02d}_img.png")
-                            convert_image_to_png(img_path, png_target)
-                    except Exception as e:
-                        sys.stderr.write(f"WARNING: Failed to extract shape image on slide {slide_num}: {e}\n")
-                        image_extraction_error = True
+                        img_w, img_h = shape.image.size
+                    except Exception:
+                        pass
+                if img_w == 0 or img_h == 0:
+                    img_w = getattr(shape, "width", 0) // 9525
+                    img_h = getattr(shape, "height", 0) // 9525
+                
+                is_tiny = (img_w > 0 and img_h > 0 and (img_w < 150 or img_h < 150 or (img_w * img_h) < 25000))
+                shape_w = getattr(shape, "width", 0)
+                shape_h = getattr(shape, "height", 0)
+                slide_w = getattr(prs, "slide_width", 9144000)
+                slide_h = getattr(prs, "slide_height", 6858000)
+                is_full_bg = bool(shape_w >= slide_w * 0.80 and shape_h >= slide_h * 0.80 and len(text_lines) >= 3)
+                
+                if not is_tiny and not is_full_bg:
+                    has_images = True
+                    if img_dir and hasattr(shape, "image") and not standalone_fig_path:
+                        try:
+                            img_bytes = shape.image.blob
+                            ext = shape.image.ext or "png"
+                            fig_filename = f"slide_{slide_num:02d}_fig.{ext}"
+                            fig_path_raw = os.path.join(img_dir, fig_filename)
+                            if not os.path.exists(fig_path_raw):
+                                with open(fig_path_raw, "wb") as f_img:
+                                    f_img.write(img_bytes)
+                            if ext.lower() != "png":
+                                png_target = os.path.join(img_dir, f"slide_{slide_num:02d}_fig.png")
+                                standalone_fig_path = convert_image_to_png(fig_path_raw, png_target)
+                            else:
+                                standalone_fig_path = fig_path_raw
+                            has_standalone_figure = True
+                        except Exception as e:
+                            sys.stderr.write(f"WARNING: Failed to extract shape image on slide {slide_num}: {e}\n")
+                            image_extraction_error = True
                         
         if not title and text_lines:
             title = text_lines[0]
@@ -351,6 +375,8 @@ def extract_pptx(pptx_path, img_dir=None):
             "text_lines": text_lines,
             "ocr_text_lines": ocr_lines,
             "has_images": has_images,
+            "has_standalone_figure": has_standalone_figure,
+            "fig_path": standalone_fig_path,
             "full_slide_rendered": full_rendered,
             "has_tables": has_tables,
             "has_image_table": has_image_table,
@@ -390,9 +416,62 @@ def extract_pdf(pdf_path, img_dir=None):
         text = page.get_text()
         raw_lines = [line.strip() for line in text.split("\n") if line.strip()]
         
-        # Detect images
+        total_chars = sum(len(line) for line in raw_lines)
+        total_words = sum(len(line.split()) for line in raw_lines)
+        has_substantive_text = (len(raw_lines) >= 3 or total_words >= 15)
+
+        # Multi-criteria embedded image classification & extraction
         image_list = page.get_images(full=True)
-        has_images = len(image_list) > 0
+        substantive_images = []
+        page_w = page.rect.width if page.rect else 0
+        page_h = page.rect.height if page.rect else 0
+        page_area = (page_w * page_h) if (page_w > 0 and page_h > 0) else 1
+
+        for img_info in image_list:
+            xref = img_info[0]
+            try:
+                base_img = doc.extract_image(xref)
+                if not base_img:
+                    continue
+                w = base_img.get("width", 0)
+                h = base_img.get("height", 0)
+                # 1. Skip tiny icons, bullets, small emblems (< 150px or < 25000 px^2)
+                if w < 150 or h < 150 or (w * h) < 25000:
+                    continue
+                
+                # 2. Skip full-slide template background wallpapers if substantive text exists
+                rects = page.get_image_rects(xref)
+                if has_substantive_text and rects:
+                    r = rects[0]
+                    coverage = (r.width * r.height) / page_area
+                    if coverage > 0.80:
+                        continue
+                elif has_substantive_text and not rects:
+                    if w >= 800 and h >= 600 and abs((w / h) - (page_w / page_h)) < 0.15:
+                        continue
+                        
+                substantive_images.append((xref, base_img))
+            except Exception:
+                pass
+
+        # Standalone embedded figure extraction
+        standalone_fig_path = None
+        has_standalone_figure = False
+        if img_dir and substantive_images:
+            try:
+                xref_to_extract, base_info = substantive_images[0]
+                pix_fig = pymupdf.Pixmap(doc, xref_to_extract)
+                if pix_fig.n >= 5:
+                    pix_fig = pymupdf.Pixmap(pymupdf.csRGB, pix_fig)
+                fig_filename = f"slide_{slide_num:02d}_fig.png"
+                fig_full_path = os.path.join(img_dir, fig_filename)
+                pix_fig.save(fig_full_path)
+                standalone_fig_path = fig_full_path
+                has_standalone_figure = True
+            except Exception as e:
+                sys.stderr.write(f"WARNING: Failed to extract standalone figure for slide {slide_num}: {e}\n")
+
+        has_images = bool(len(substantive_images) > 0 or (len(raw_lines) == 0 and len(image_list) > 0))
         
         # Render high-res page image if requested
         img_path = None
@@ -481,6 +560,8 @@ def extract_pdf(pdf_path, img_dir=None):
             "text_lines": raw_lines,
             "ocr_text_lines": ocr_lines,
             "has_images": has_images,
+            "has_standalone_figure": has_standalone_figure,
+            "fig_path": standalone_fig_path,
             "has_tables": has_tables,
             "has_image_table": has_image_table,
             "has_image_text": has_image_text,

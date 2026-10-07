@@ -1,21 +1,23 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.5.0): enforces Table Completeness Gate
-  (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table row preservation without summarization),
-  Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of non-existent rows/grades),
-  Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses),
-  Universal Reference Note Sanitization & Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory),
-  Substantive Medical Concept Denominator Filtering (filters routine English prose verbs and fillers from recall denominator),
-  Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR),
-  Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT),
-  Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads),
-  Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
-  Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 121-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Publication-grade medical study guide and lecture transcription workflow (v5.6.0): enforces Smart Visual Asset Classifier
+  & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure clinical
+  diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English
+  screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic
+  cell-by-cell table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric
+  memory hallucination of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
+  UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Universal Reference Note Sanitization &
+  Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator Filtering
+  (filters routine English prose verbs and fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF,
+  SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate
+  (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads), Track 3 Reference
+  Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping
+  (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering, Automated
+  124-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.5.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.6.0)
 
 ## Overview
 
@@ -191,10 +193,14 @@ uv run python scripts/verify_slide_alignment.py --raw raw_slides.json --translat
 
 ---
 
-### H. Universal Visual Content Architecture (معماری بصری جامع و هدفمند)
-1. **Targeted Visual Roles:**
+### H. Universal Visual Content Architecture & Standalone Figure Engine (معماری بصری جامع و موتور تفکیک نگاره‌های مستقل)
+1. **Targeted Visual Roles & Smart Filtering:**
    - **Pure Text Slides (اسلایدهای صرفاً متنی):** Do NOT include a redundant screenshot of plain English text. They are translated cleanly and completely into Persian bullet points inside the slide box.
-   - **Visual Slides (جداول، دیاگرام‌ها، فلوچارت‌ها و تصاویر آناتومیک):**
+     - **Smart Text Slide Screenshot Guard:** گارد هوشمند کامپایلر ورد به صورت خودکار مانع درج اسکرین‌شات انگلیسی کامل صفحه برای اسلایدهایی می‌شود که دارای متن ماهوی هستند و فاقد جدول، چارت یا نگاره مستقل می‌باشند. همچنین المان‌های تزئینی (بولت‌ها و آیکون‌های زیر ۱۵۰ پیکسل) و تصاویر پس‌زمینه اسلاید مستر (Template Backgrounds) توسط موتور استخراج پالایش می‌شوند.
+   - **Mixed Slides (اسلایدهای ترکیبی متن و شکل):**
+     - در اسلایدهایی که متن در کنار یک نمودار/شکل قرار دارد (نظیر فلوچارت‌های غدد و محورهای هورمونی)، موتور استخراج مستقیماً شیء نگاره مستقل را به صورت فایل مجزا (`slide_NN_fig.png`) استخراج می‌کند.
+     - موتور کشف تصاویر (`find_and_prepare_slide_image`) اولویت قطعی را به این نگاره مستقل می‌دهد؛ بنابراین در سند Word صرفاً خودِ تصویر نمودار درج شده و متن اسلاید به صورت بولت‌های سلیس فارسی در کنار آن قرار می‌گیرد، بدون آنکه پاراگراف‌های انگلیسی خام کل اسلاید تکرار شوند.
+   - **Visual Slides (جداول، تصاویر بالینی، لام‌های پاتولوژی و الگوریتم‌های تمام‌صفحه):**
      - **Dual Presentation (تصویر اصلی + جدول/متن فارسی):** برای اسلایدهای تصویری و جداول، هرگز تصویر انگلیسی اصلی نباید سرکوب شود! هم اسکرین‌شات باکیفیت انگلیسی و هم جدول/دیاگرام بازسازی‌شده فارسی در کادر اسلاید درج می‌شوند تا دانشجو بتواند مرجع انگلیسی و ساختار فارسی را در کنار هم مشاهده کند.
      - **Track 1:** Displays the original high-resolution English diagram/table image alongside the professor's lecture breakdown (`add_figure_with_caption`).
      - **Track 2 (Slide Box):** Displays the slide box. If the figure was NOT already embedded in Track 1 (`image_already_shown=False`), it MUST be embedded inside the slide box.

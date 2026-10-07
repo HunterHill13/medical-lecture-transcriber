@@ -1,7 +1,7 @@
 {
   "name": "medical-lecture-transcriber",
-  "version": "5.5.0",
-  "skill_version": "5.5.0",
+  "version": "5.6.0",
+  "skill_version": "5.6.0",
   "description": "Publication-grade Persian medical lecture transcription and slide study guide generator",
   "skills": ["medical-lecture-transcriber"]
 }
