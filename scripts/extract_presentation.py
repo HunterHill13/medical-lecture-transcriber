@@ -187,7 +187,9 @@ def render_pptx_slides_to_images(pptx_path: str, img_dir: str) -> bool:
 TABLE_INDICATOR_KEYWORDS = {
     "table", "classification", "causes", "cause", "differential", "diagnosis",
     "criteria", "staging", "grading", "summary", "features", "comparison",
-    "overview", "جدول", "طبقه‌بندی", "تشخیص", "افتراقی", "علل", "معیارها"
+    "overview", "protocol", "guideline", "care", "comprehensive",
+    "جدول", "طبقه‌بندی", "طبقه بندی", "تشخیص", "افتراقی", "علل", "معیارها",
+    "معیار", "گرید", "درجه‌بندی", "درجه بندی", "مراقبت", "راهنما", "دستورالعمل", "پایش"
 }
 
 def detect_image_table(title: str, text_lines: list, ocr_lines: list, has_images: bool) -> bool:
@@ -199,6 +201,10 @@ def detect_image_table(title: str, text_lines: list, ocr_lines: list, has_images
         return False
     combined_text = (str(title) + " " + " ".join(text_lines) + " " + " ".join(ocr_lines)).lower()
     
+    # 0. Direct table reference pattern (e.g. Table 404-1, جدول ۴۰۴-۱)
+    if has_images and (re.search(r'(?:table\s*[\d\-]+|جدول\s*[\d\-\u06F0-\u06F9]+)', combined_text) or "جدول" in combined_text):
+        return True
+
     # 1. Keyword check in title or text
     has_keyword = any(kw in combined_text for kw in TABLE_INDICATOR_KEYWORDS)
     

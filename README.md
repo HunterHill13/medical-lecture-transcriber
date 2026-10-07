@@ -1,11 +1,11 @@
-# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.3.0)
+# 🩺 Medical Lecture Transcriber & Study Guide Generator (v5.4.0)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/Tests-112%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-118%20Passed-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-5.3.0-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/Version-5.4.0-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/Google%20Antigravity-Compatible-blueviolet?style=for-the-badge)](https://antigravity.google)
 
@@ -26,31 +26,45 @@ Prevents translation shortcuts and visual pollution:
 * English terms in translated slide bullets are strictly restricted to concise proper nouns, drug names, and domain acronyms (maximum 1–4 words, e.g., `(Duodenum)`, `(Corrected calcium)`, `(Cinacalcet)`, `(PTH)`).
 * Copy-pasting full English clauses or sentences with verbs/conjunctions triggers an immediate hard validation error.
 
-### 3. 🔬 Substantive Concept Denominator Filtering
+### 3. 🔬 Substantive Concept Denominator Filtering & Expanded Medical Thesaurus
 * Filters routine English academic prose verbs and fillers (`cannot`, `provide`, `enough`, `replace`, `losses`, `under`, `circumstances`, `directed`) from recall denominators.
 * Evaluates true clinical entities, formulas, chemical notations (`Ca²⁺`, `HCO₃⁻`), measurements, and acronyms, allowing fluent academic Persian translation to pass 100% cleanly without artificial English token crutches.
+* Expanded bilingual dictionary covering diabetic foot, Wagner classification, orthotics (`aircast walker`), lipidology, and cardiovascular risk paradigms.
 
 ### 4. 📊 Table Completeness & Diagnostic Preservation Gate (`TABLE_COMPLETENESS_GATE`)
 * Enforces zero-omission atomic line-by-line translation for textbook tables, classifications, and diagnostic criteria.
-* Automatically marks table screenshots as `has_image_table: true` and blocks slide exemption.
+* Automatically marks table screenshots and guideline tables as `has_image_table: true` and blocks slide exemption even in the presence of OCR noise.
 * Validates that all subcategories, parenthetical entities (e.g., Aluminum intoxication, Lithium therapy, Multiple myeloma), and criteria are fully translated in `table_data`, raising blocking errors (`MISSING_TABLE_DATA`, `INCOMPLETE_TABLE_TRANSCRIPTION`) if rows are dropped or summarized away.
 
-### 5. ☁️ Gemini Multimodal Audio Transcription Protocol
+### 5. 🛑 Table Hallucination Guard (`UNGROUNDED_TABLE_ROW_CONTENT`)
+* Audits every translated table row against raw slide text and OCR tokens.
+* Detects and blocks parametric memory hallucinations of non-existent rows, grades, or categories (e.g., injecting an ungrounded "Grade 0" into a slide containing Wagner grades 1 to 5).
+
+### 6. 🛑 Unparenthesized English Clause Guard (`UNPROCESSED_ENGLISH_CLAUSE_VIOLATION`)
+* Strictly inspects Persian bullet prose outside parentheses for raw, untranslated English clauses ($\ge 4$ words with clause markers or $\ge 5$ consecutive English tokens).
+* Eliminates the shortcut of dumping raw English prose directly into Persian text to satisfy recall thresholds without triggering parenthetical checks.
+
+### 7. 🔄 Raw Slides Visual & Structural Auto-Inheritance
+* Master pamphlet compiler (`create_slide_pamphlet.py`) seamlessly inherits visual metadata (`has_images`, `has_charts`, `has_tables`, `has_image_table`, `is_visual`, `img_path`) directly from `raw_slides.json` (via `--raw` or automatic discovery).
+* Guarantees that clinical photographs, pathology samples, devices, and curves are embedded in Word documents even if downstream translation JSON omitted visual flags.
+* Injects a prominent structural deficiency advisory banner (`⚠️ تذکر ساختاری`) into the study guide if a table exists in the source slide but `table_data` was omitted.
+
+### 8. ☁️ Gemini Multimodal Audio Transcription Protocol
 * Native in-context audio comprehension leveraging Google Gemini multimodal capabilities.
 * Strictly prohibits heavy local Whisper/CUDA downloads, saving gigabytes of disk space and GPU memory while preserving exact Persian medical pronunciation.
 
-### 6. 👁️ Visual-Aware OCR & Confidence Thresholding
+### 9. 👁️ Visual-Aware OCR & Confidence Thresholding
 * Intelligently triggers OCR for slides containing images, micrographs, charts, smart art, or tables, regardless of digital text volume.
 * Filters OCR noise using statistical confidence thresholds (`mean_conf >= 0.60`, substantive tokens $\ge 2$).
 * Displays warning banners in Word documents if embedded image extraction fails.
 
-### 7. 📈 Universal Vector & Chart Rasterization Engine (`convert_image_to_png`)
+### 10. 📈 Universal Vector & Chart Rasterization Engine (`convert_image_to_png`)
 * Automatically detects and converts non-raster vector shapes, metafiles, and specialized formats (`.wmf`, `.emf`, `.svg`, `.webp`, `.tiff`, `.bmp`) to standard PNG during both presentation extraction and Word compilation.
 * Dynamic multi-pattern candidate discovery (`find_and_prepare_slide_image`) resolves any slide chart or diagram graphic asset without hardcoded filename fragility.
 * Enforces the `VISUAL_ASSET_AUDIT` gate and renders student advisory banners when graphic chart assets cannot be embedded.
 
-### 8. 🧪 112-Test Automated Quality Suite
-* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, and schema integrity.
+### 11. 🧪 118-Test Automated Quality Suite
+* Comprehensive unit, integration, and adversarial tests ensuring page index invariance, zero content drift, chronological audio grounding, vector rasterization, table hallucination guards, unparenthesized English clause detection, and schema integrity.
 
 ---
 

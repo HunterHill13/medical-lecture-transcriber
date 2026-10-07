@@ -1,19 +1,20 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.3.0): enforces Table Completeness Gate
+  Publication-grade medical study guide and lecture transcription workflow (v5.4.0): enforces Table Completeness Gate
   (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table row preservation without summarization),
-  Anti-Clause Parentheses Gate (PARENTHETICAL_CLAUSE_VIOLATION strictly restricts parenthetical English to <= 4 words of concise proper/drug names and blocks full clauses),
+  Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of non-existent rows/grades),
+  Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses),
   Substantive Medical Concept Denominator Filtering (filters routine English prose verbs and fillers from recall denominator),
   Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR),
-  Dynamic Candidate Image Discovery, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT),
+  Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT),
   Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads),
   Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
-  Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (248 non-generic concepts + phrases),
-  Visual-Aware OCR Triggering, Automated 112-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
+  Visual-Aware OCR Triggering, Automated 118-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.3.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.4.0)
 
 ## Overview
 

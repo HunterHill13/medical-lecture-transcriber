@@ -147,6 +147,15 @@ BILINGUAL_MEDICAL_CONCEPTS = {
     "adrenal": {"آدرنال", "فوق‌کلیه", "فوق‌کلیوی"},
     "pituitary": {"هیپوفیز", "پیتویتری"},
     "hypothalamus": {"هیپوتالاموس"},
+    "ulcer": {"زخم"},
+    "wagner": {"واگنر"},
+    "walker": {"واکر", "بریس"},
+    "pneumatic": {"بادی", "پنوماتیک"},
+    "aircast": {"ایرکست", "واکر", "بریس"},
+    "microvascular": {"میکروواسکولار", "عروق", "ریز"},
+    "macrovascular": {"ماکروواسکولار", "عروق", "بزرگ"},
+    "glycemic": {"قند", "گلیسمیک", "گلایسمیک", "گلوکز"},
+    "statin": {"استاتین"},
 
     # Cardiovascular
     "hypertension": {"پرفشاری", "فشارخون", "هایپرتانسیون", "هیپرتانسیون", "فشار"},
@@ -608,6 +617,20 @@ BILINGUAL_CONCEPT_PHRASES = {
     # Renal
     ("renal", "failure"): ["نارسایی کلیه", "نارسایی کلیوی"],
     ("kidney", "failure"): ["نارسایی کلیه", "نارسایی کلیوی"],
+    # Diabetic Complications & Orthotics
+    ("aircast", "walker"): ["واکر بادی", "واکر ایرکست", "بریس ایرکست", "واکر پنوماتیک"],
+    ("pneumatic", "walker"): ["واکر بادی", "واکر پنوماتیک"],
+    ("diabetic", "foot"): ["پای دیابتی", "زخم پای دیابتی", "پای دیابتیک"],
+    ("conversion", "kit"): ["کیت تبدیل", "کیت مبدل"],
+    ("glycemic", "control"): ["کنترل قند", "کنترل گلوکز", "کنترل گلایسمیک"],
+    ("organ", "protection"): ["محافظت از اعضا", "حفاظت از ارگان", "حفاظت ارگانها", "حفاظت کلیوی و قلبی"],
+    ("paradigm", "shift"): ["تغییر پارادایم", "تغییر رویکرد", "چرخش رویکرد", "تحول بنیادین"],
+    ("microvascular", "complications"): ["عوارض میکروواسکولار", "عوارض عروق ریز"],
+    ("macrovascular", "complications"): ["عوارض ماکروواسکولار", "عوارض عروق بزرگ"],
+    ("wagner", "classification"): ["طبقه بندی واگنر", "درجه بندی واگنر", "سیستم واگنر"],
+    ("ulcer", "classification"): ["طبقه بندی زخم", "درجه بندی زخم"],
+    ("statin", "intensity"): ["شدت استاتین", "دوز استاتین"],
+    ("comprehensive", "care"): ["مراقبت جامع", "مراقبت های جامع", "پایش جامع"],
 }
 
 # Specific, unambiguous Persian medical synonyms (strictly non-generic)

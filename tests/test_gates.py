@@ -1782,6 +1782,84 @@ def test_visual_asset_audit_passes_when_image_resolved(tmp_path):
     assert not any(i.get("type") == "VISUAL_ASSET_AUDIT" for i in issues)
 
 
+def test_ungrounded_table_row_content_catches_hallucinated_grade_0():
+    """Verifies that UNGROUNDED_TABLE_ROW_CONTENT catches hallucinated Grade 0 in Wagner classification."""
+    raw_item = {
+        "slide_number": 32,
+        "title_raw": "Wagner Ulcer Classification System",
+        "text_lines": [
+            "Wagner Ulcer Classification System",
+            "Grade 1: Superficial ulcer",
+            "Grade 2: Deep ulcer penetrating to tendon or capsule",
+            "Grade 3: Deep ulcer with abscess or osteomyelitis",
+            "Grade 4: Gangrene of forefoot",
+            "Grade 5: Extensive gangrene of entire foot"
+        ],
+        "has_tables": True
+    }
+    trans_item = {
+        "slide_number": 32,
+        "title_fa": "سیستم طبقه‌بندی زخم واگنر",
+        "title_en": "Wagner Ulcer Classification System",
+        "table_data": {
+            "headers": ["درجه زخم", "توصیف بالینی"],
+            "rows": [
+                {"cols": ["گرید ۰", "پای در معرض خطر بدون ضایعه یا زخم باز"]},
+                {"cols": ["گرید ۱", "زخم سطحی درم"]},
+                {"cols": ["گرید ۲", "زخم عمقی درگیرکننده تاندون"]},
+                {"cols": ["گرید ۳", "زخم عمقی همراه با استئومیلیت"]},
+                {"cols": ["گرید ۴", "گانگرن موضعی قدام پا"]},
+                {"cols": ["گرید ۵", "گانگرن وسیع تمام پا"]}
+            ]
+        }
+    }
+    issues = check_slide_pair(raw_item, trans_item)
+    errs = [i for i in issues if i.get("type") == "UNGROUNDED_TABLE_ROW_CONTENT"]
+    assert len(errs) >= 1
+    assert errs[0]["slide_number"] == 32
+    assert "گرید ۰" in errs[0].get("hallucinated_item", "")
+
+
+def test_unprocessed_english_clause_violation_catches_unparenthesized_english():
+    """Verifies that UNPROCESSED_ENGLISH_CLAUSE_VIOLATION catches raw English clauses left outside parentheses."""
+    raw_item = {
+        "slide_number": 53,
+        "title_raw": "Cardiorenal Paradigm Shift",
+        "text_lines": ["The paradigm shift from glycemic control to organ protection in diabetes management"],
+        "has_images": True
+    }
+    trans_item = {
+        "slide_number": 53,
+        "title_fa": "تحول رویکرد قلبی کلیوی",
+        "title_en": "Cardiorenal Paradigm Shift",
+        "bullets": [
+            {"lead": "نکته مهم", "text": "در مدیریت نوین بیماری The Paradigm Shift from Glycemic Control to Organ Protection بسیار کلیدی است."}
+        ]
+    }
+    issues = check_slide_pair(raw_item, trans_item)
+    errs = [i for i in issues if i.get("type") == "UNPROCESSED_ENGLISH_CLAUSE_VIOLATION"]
+    assert len(errs) >= 1
+    assert errs[0]["slide_number"] == 53
+    assert "Paradigm Shift" in errs[0].get("raw_english_content", "")
+
+
+def test_bilingual_concept_recall_passes_clean_persian_translation():
+    """Verifies clean Persian translations of technical concepts satisfy recall without raw English."""
+    from text_utils import evaluate_concept_overlap, extract_tokens
+    
+    raw_text = "Aircast pneumatic walker with diabetic conversion kit for ulcer offloading"
+    raw_tokens = extract_tokens([raw_text])
+    
+    # Fluent Persian translation with zero English words
+    trans_persian = "استفاده از بریس و واکر بادی پنوماتیک همراه با کیت تبدیل پای دیابتی جهت کاهش فشار روی زخم"
+    trans_tokens = extract_tokens([trans_persian])
+    
+    common = evaluate_concept_overlap(raw_tokens, trans_tokens, trans_persian)
+    recall = len(common) / max(1, len(raw_tokens))
+    assert recall >= 0.50, f"Expected recall >= 50% for fluent Persian translation, got {recall:.2f}"
+
+
+
 
 
 

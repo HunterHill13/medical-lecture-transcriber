@@ -212,3 +212,100 @@ def test_create_slide_pamphlet_advisory_banner_on_missing_chart(tmp_path):
     assert "تذکر آموزشی: این اسلاید حاوی نمودار/شکل تخصصی است" in text_content
 
 
+def test_build_pamphlet_inherits_visual_flags_and_image_from_raw_slides(tmp_path):
+    """Verifies that build_pamphlet_from_json inherits has_images and img_path from raw_slides.json."""
+    from create_slide_pamphlet import build_pamphlet_from_json
+    import json
+    
+    # Create fake image
+    img_dir = tmp_path / "slide_images"
+    img_dir.mkdir()
+    fake_img = str(img_dir / "slide_33.png")
+    with open(fake_img, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\nfake")
+        
+    raw_slides = [
+        {
+            "slide_number": 33,
+            "title_raw": "Charcot Neuroarthropathy Clinical Presentation",
+            "has_images": True,
+            "img_path": fake_img
+        }
+    ]
+    raw_path = tmp_path / "raw_slides.json"
+    raw_path.write_text(json.dumps(raw_slides, ensure_ascii=False), encoding="utf-8")
+    
+    # translated_slides.json has NO has_images or img_path (simulating agent omitting them)
+    trans_slides = [
+        {
+            "slide_number": 33,
+            "title_fa": "تظاهرات بالینی نوروآرتروپاتی شارکو",
+            "title_en": "Charcot Neuroarthropathy",
+            "bullets": [
+                {"lead": "مشخصات بالینی", "text": "تغییر شکل استخوانی و زخم مفاصل پا"}
+            ]
+        }
+    ]
+    trans_path = tmp_path / "translated.json"
+    trans_path.write_text(json.dumps(trans_slides, ensure_ascii=False), encoding="utf-8")
+    
+    out_docx = str(tmp_path / "pamphlet_inherited.docx")
+    build_pamphlet_from_json(str(trans_path), out_docx, img_dir=str(img_dir), raw_slides_path=str(raw_path))
+    assert os.path.exists(out_docx)
+    
+    doc = docx.Document(out_docx)
+    # Check that doc has an embedded image picture
+    has_picture = False
+    for t in doc.tables:
+        for r in t.rows:
+            for c in r.cells:
+                for p in c.paragraphs:
+                    for run in p.runs:
+                        if "drawing" in run._r.xml:
+                            has_picture = True
+    assert has_picture is True, "Expected image to be embedded in docx via raw_slides metadata inheritance"
+
+
+def test_build_pamphlet_renders_table_structural_advisory_on_missing_table_data(tmp_path):
+    """Verifies that when raw_slides has has_tables: True but translation only has bullets, a warning is rendered."""
+    from create_slide_pamphlet import build_pamphlet_from_json
+    import json
+    
+    raw_slides = [
+        {
+            "slide_number": 17,
+            "title_raw": "Statin Therapy Intensity Classification",
+            "has_tables": True
+        }
+    ]
+    raw_path = tmp_path / "raw_slides.json"
+    raw_path.write_text(json.dumps(raw_slides, ensure_ascii=False), encoding="utf-8")
+    
+    trans_slides = [
+        {
+            "slide_number": 17,
+            "title_fa": "طبقه‌بندی شدت درمان با استاتین",
+            "title_en": "Statin Therapy Intensity Classification",
+            "bullets": [
+                {"lead": "دوز بالا", "text": "آتورواستاتین ۴۰ الی ۸۰ میلی‌گرم"}
+            ]
+            # No table_data provided
+        }
+    ]
+    trans_path = tmp_path / "translated.json"
+    trans_path.write_text(json.dumps(trans_slides, ensure_ascii=False), encoding="utf-8")
+    
+    out_docx = str(tmp_path / "pamphlet_table_warning.docx")
+    build_pamphlet_from_json(str(trans_path), out_docx, raw_slides_path=str(raw_path))
+    assert os.path.exists(out_docx)
+    
+    doc = docx.Document(out_docx)
+    all_text = ""
+    for t in doc.tables:
+        for r in t.rows:
+            for c in r.cells:
+                all_text += "\n" + "\n".join(p.text for p in c.paragraphs)
+    assert "تذکر ساختاری: اسلاید اصلی حاوی جدول است" in all_text
+
+
+

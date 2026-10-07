@@ -773,6 +773,12 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
             headers, items_data = [], []
         if headers and items_data:
             render_reference_table(cell1, headers, items_data, ref_book_name=ref_book_name)
+    elif (slide_data.get("has_tables") or slide_data.get("has_image_table")) and not is_ceremonial:
+        tp = cell1.add_paragraph() if not first_item else cell1.paragraphs[0]
+        first_item = False
+        set_p_rtl(tp, space_before=2, space_after=3)
+        add_r(tp, "⚠️ [تذکر ساختاری: اسلاید اصلی حاوی جدول است؛ جهت پایش سلول‌به‌سلول اطلاعات به فایل ارائه مراجعه فرمایید.]",
+              font_name="Dubai", size_pt=9.5, italic=True, color_rgb=(0xD3, 0x54, 0x00))
         
     sp = doc.add_paragraph()
     sp.paragraph_format.space_before = Pt(0)
@@ -902,7 +908,7 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
             set_p_rtl(p, space_before=2.5, space_after=3.5, align_justify=True)
             add_formatted_bidi_text(p, block.get("text", ""), font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
 
-def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جزوه جامع پزشکی", ref_book=None, img_dir=None):
+def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جزوه جامع پزشکی", ref_book=None, img_dir=None, raw_slides_path=None):
     if not os.path.isfile(translated_json_path):
         raise FileNotFoundError(f"Translated slides JSON file not found: '{translated_json_path}'")
     try:
@@ -914,6 +920,20 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
     if not isinstance(slides, list):
         raise ValueError(f"Expected a JSON list of slide objects in '{translated_json_path}', got {type(slides).__name__}")
         
+    # Auto-discover raw_slides.json if not explicitly provided
+    if not raw_slides_path and os.path.isfile("raw_slides.json"):
+        raw_slides_path = "raw_slides.json"
+        
+    raw_db = {}
+    if raw_slides_path and os.path.isfile(raw_slides_path):
+        try:
+            with open(raw_slides_path, "r", encoding="utf-8") as f_raw:
+                raw_list = json.load(f_raw)
+                if isinstance(raw_list, list):
+                    raw_db = {s.get("slide_number"): s for s in raw_list if isinstance(s, dict) and "slide_number" in s}
+        except Exception:
+            pass
+
     doc = docx.Document()
     
     # Font availability verification
@@ -996,15 +1016,33 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
             elif isinstance(cr, str):
                 add_cross_reference_box(doc, "", cr)
                 
-        # Track 2: Slide Box
-        img_path = slide.get("img_path")
+        # Track 2: Slide Box & Metadata Augmentation
+        raw_item = raw_db.get(num, {})
+        slide_augmented = dict(slide)
+        if raw_item:
+            if raw_item.get("has_images"):
+                slide_augmented["has_images"] = True
+            if raw_item.get("has_charts"):
+                slide_augmented["has_charts"] = True
+            if raw_item.get("has_smartart"):
+                slide_augmented["has_smartart"] = True
+            if raw_item.get("has_tables"):
+                slide_augmented["has_tables"] = True
+            if raw_item.get("has_image_table"):
+                slide_augmented["has_image_table"] = True
+            if raw_item.get("is_pure_visual") or raw_item.get("is_image_only"):
+                slide_augmented["is_pure_visual"] = True
+            if bool(slide_augmented.get("has_images") or slide_augmented.get("has_charts") or slide_augmented.get("has_smartart") or slide_augmented.get("has_tables") or slide_augmented.get("has_image_table") or slide_augmented.get("is_pure_visual")):
+                slide_augmented["is_visual"] = True
+
+        img_path = slide_augmented.get("img_path") or raw_item.get("img_path")
         if img_path and os.path.exists(img_path):
             img_path = convert_image_to_png(img_path)
         elif img_dir:
             img_path = find_and_prepare_slide_image(img_dir, num)
                 
-        table_data = slide.get("table_data", None)
-        add_slide_box_from_json(doc, slide, img_path=img_path, table_data=table_data, ref_book_name=ref_book)
+        table_data = slide_augmented.get("table_data", None)
+        add_slide_box_from_json(doc, slide_augmented, img_path=img_path, table_data=table_data, ref_book_name=ref_book)
         
     doc.save(output_docx_path)
     print(f"✅ جزوه با موفقیت در '{output_docx_path}' ذخیره شد.")
@@ -1016,7 +1054,8 @@ if __name__ == "__main__":
     parser.add_argument("--title", default="جزوه جامع پزشکی", help="Document Title")
     parser.add_argument("--ref-book", choices=["هاریسون", "برانوالد", "شوارتز", "نلسون", "ویلیامز", "رابینز", "کاتزونگ", "گایتون"], default=None, help="Reference book name")
     parser.add_argument("--img-dir", default="./slide_images", help="Slide images directory")
+    parser.add_argument("--raw", default=None, help="Optional path to raw_slides.json for metadata inheritance")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     
     args = parser.parse_args()
-    build_pamphlet_from_json(args.translated, args.output, title=args.title, ref_book=args.ref_book, img_dir=args.img_dir)
+    build_pamphlet_from_json(args.translated, args.output, title=args.title, ref_book=args.ref_book, img_dir=args.img_dir, raw_slides_path=args.raw)

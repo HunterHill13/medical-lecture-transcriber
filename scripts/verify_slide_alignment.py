@@ -773,6 +773,29 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                         "remediation_action": "Remove English clause from parentheses and express the statement cleanly in Persian prose."
                     })
 
+            # Check 3.3.1b: Unprocessed English Clause Violation (outside parentheses)
+            # Strictly forbids leaving unparenthesized, un-translated English sentences or clauses directly in Persian bullets.
+            unparenthesized_txt = re.sub(r'[\(（][^)）]+[\)）]', ' ', b_txt)
+            raw_en_runs = re.findall(r'[A-Za-z]+(?:\s+[A-Za-z]+){3,}', unparenthesized_txt)
+            for en_run in raw_en_runs:
+                run_clean = en_run.strip()
+                en_run_words = re.findall(r'[A-Za-z]+', run_clean)
+                has_run_clause = any(w.lower() in CLAUSE_MARKERS for w in en_run_words)
+                if len(en_run_words) >= 5 or (len(en_run_words) >= 4 and has_run_clause):
+                    issues.append({
+                        "type": "UNPROCESSED_ENGLISH_CLAUSE_VIOLATION",
+                        "error_type": "UNPROCESSED_ENGLISH_CLAUSE_VIOLATION",
+                        "severity": "error",
+                        "slide_number": num,
+                        "bullet_index": b_idx,
+                        "raw_english_content": run_clean[:80],
+                        "word_count": len(en_run_words),
+                        "message": (f"UNPROCESSED ENGLISH CLAUSE VIOLATION at Slide {num}, Bullet {b_idx}: Bullet contains un-translated English "
+                                    f"clause or phrase ('{run_clean[:60]}...') directly in Persian prose! Slide boxes must be fluent Persian "
+                                    f"academic translations; raw English clauses cannot be left un-translated outside parentheses."),
+                        "remediation_action": "Translate English clause into Persian prose rather than leaving raw English words in slide text."
+                    })
+
         # Check 3.4: Source Exclusivity & Unsupported Slide Box Content Audit
         # Ensures translated slide box does not inject extensive ungrounded external technical concepts.
         num_digital = len(raw_item.get("text_lines", []))
@@ -943,6 +966,49 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                 "message": err_msg,
                 "remediation_action": f"Remove ungrounded external concepts {sorted(list(all_unsupported))[:4]} from Slide {num} bullets or move them to ref_note."
             })
+
+        # Check 3.4b: Table Row Ungrounded Content Audit (Table Hallucination Gate)
+        # Prevents parametric memory leakage into table_data (e.g. injecting Grade 0 into Wagner classification when raw slide only has 1-5)
+        if td and not is_student_review:
+            raw_full_table_text = " ".join(raw_item.get("text_lines", []) + raw_item.get("ocr_text_lines", [])).lower()
+            raw_full_tokens = extract_tokens([raw_full_table_text])
+            raw_norm = normalize_for_matching(raw_full_table_text)
+            
+            rows = []
+            if isinstance(td, dict):
+                rows = td.get("rows") or td.get("items", [])
+            elif isinstance(td, (list, tuple)) and len(td) == 2:
+                rows = td[1]
+                
+            for r_idx, r in enumerate(rows):
+                row_str = ""
+                if isinstance(r, dict):
+                    row_str = r.get("text", "") + " " + " ".join(str(c) for c in r.get("cols", []))
+                elif isinstance(r, (list, tuple)):
+                    row_str = " ".join(str(c) for c in r)
+                elif isinstance(r, str):
+                    row_str = r
+                
+                # Check for numerical / grade classification hallucination:
+                # E.g. Grade 0 / گرید ۰ when '0' or 'zero' or '۰' does not exist anywhere in raw slide
+                grade_match = re.search(r'(?:گرید|درجه|grade|stage|گروه|تیپ)\s*([0-9\u06F0-\u06F9IVXLCDM]+)', row_str, re.IGNORECASE)
+                if grade_match:
+                    found_grade = grade_match.group(1).lower()
+                    grade_norm = normalize_for_matching(found_grade)
+                    if grade_norm not in raw_norm and found_grade not in raw_full_table_text:
+                        issues.append({
+                            "type": "UNGROUNDED_TABLE_ROW_CONTENT",
+                            "error_type": "UNGROUNDED_TABLE_ROW_CONTENT",
+                            "severity": "error",
+                            "slide_number": num,
+                            "row_index": r_idx,
+                            "hallucinated_item": grade_match.group(0),
+                            "message": (f"UNGROUNDED TABLE ROW CONTENT at Slide {num}, Row {r_idx + 1}: Table introduces fabricated category "
+                                        f"'{grade_match.group(0)}' not found anywhere in Raw Slide {num}! Table data must strictly reflect "
+                                        f"the slide content without parametric memory hallucination."),
+                            "remediation_action": f"Remove ungrounded item '{grade_match.group(0)}' from Slide {num} table_data."
+                        })
+
     elif not ceremonial:
         # Check for silent bypass on text slides
         raw_text_len = sum(len(l.strip()) for l in raw_lines)

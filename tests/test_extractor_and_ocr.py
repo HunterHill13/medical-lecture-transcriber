@@ -825,6 +825,19 @@ def test_find_and_prepare_slide_image_dynamic_discovery(tmp_path):
     assert found_png.endswith(".png")
 
 
+def test_detect_image_table_persian_guideline_table():
+    """Verifies that detect_image_table identifies Persian guideline tables even with noisy OCR text."""
+    from extract_presentation import detect_image_table
+
+    title = "جدول ۴۰۴-۱: مراقبت جامع از بیمار مبتلا به دیابت"
+    text_lines = ["جدول ۴۰۴-۱: مراقبت جامع از بیمار مبتلا به دیابت"]
+    # Simulated noisy OCR from mixed English engine
+    noisy_ocr = ["jdwl 404-1 mraqbt jam' az bymar", "glycemic monitoring", "foot exam"]
+    is_table = detect_image_table(title, text_lines, noisy_ocr, has_images=True)
+    assert is_table is True, "Expected detect_image_table to identify Persian table screenshot via keyword/numbering regex"
+
+
+
 
 
 
