@@ -12,6 +12,7 @@ import sys
 import json
 import argparse
 import re
+import subprocess
 
 if sys.stdout.encoding != 'utf-8':
     try:
@@ -246,6 +247,13 @@ def extract_pptx(pptx_path, img_dir=None):
     if img_dir:
         full_rendered = render_pptx_slides_to_images(pptx_path, img_dir)
         
+    def iter_slide_shapes(shapes):
+        for s in shapes:
+            if getattr(s, "shape_type", None) == getattr(MSO_SHAPE_TYPE, "GROUP", 6) and hasattr(s, "shapes"):
+                yield from iter_slide_shapes(s.shapes)
+            else:
+                yield s
+
     for idx, slide in enumerate(prs.slides):
         slide_num = idx + 1
         title = ""
@@ -258,8 +266,8 @@ def extract_pptx(pptx_path, img_dir=None):
         standalone_fig_path = None
         image_extraction_error = False
         
-        # Check shapes
-        for shape in slide.shapes:
+        # Check shapes (recursively unrolling group shapes)
+        for shape in iter_slide_shapes(slide.shapes):
             if shape.has_text_frame:
                 for p in shape.text_frame.paragraphs:
                     t = sanitize_presentation_text(p.text.strip())

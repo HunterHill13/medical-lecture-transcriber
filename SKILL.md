@@ -1,26 +1,29 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.7.0): enforces Slide Numerical & Statistical
-  Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological ratios like '5 in 10,000',
-  statistical percentages like '0.5-2%', ranges, and cohort ages without qualitative generalization), Presentation Text Sanitization & Encoding
-  Recovery Engine (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF extraction), Smart Visual
-  Asset Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure clinical
-  diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English screenshots
-  on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table
-  row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination
-  of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
+  Publication-grade medical study guide and lecture transcription workflow (v5.7.1): enforces PowerPoint Group Shape Unrolling
+  Engine (iter_slide_shapes recursively expands MSO_SHAPE_TYPE.GROUP so grouped diagrams and text boxes are fully preserved), Native Image
+  Conversion Subprocess Recovery (fixes Windows System.Drawing fallback for WMF/EMF/TIFF/BMP conversion), Unified Pipeline CLI Argument
+  Forwarding (auto-forwards --img-dir and --raw across verification and build stages), Slide Numerical & Statistical Data Preservation Gate
+  (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological ratios like '5 in 10,000', statistical percentages
+  like '0.5-2%', ranges, and cohort ages without qualitative generalization), Presentation Text Sanitization & Encoding Recovery Engine
+  (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF extraction), Smart Visual Asset
+  Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure clinical
+  diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English
+  screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic
+  cell-by-cell table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory
+  hallucination of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
   UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Universal Reference Note Sanitization &
   Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator Filtering
-  (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF,
-  EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate
-  (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads), Track 3 Reference
-  Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping (validates line
-  citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering, Automated 128-Test Suite in tests/,
-  and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts
+  WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit
+  Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads), Track 3
+  Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping
+  (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering, Automated
+  131-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.7.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.7.1)
 
 ## Overview
 

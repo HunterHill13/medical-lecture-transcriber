@@ -1,11 +1,11 @@
-# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۷.۰)
+# 🩺 سامانه هوشمند پیاده‌سازی صوت و تدوین جزوات پزشکی (نسخه ۵.۷.۱)
 
 [🇬🇧 English](README.md) | [🇮🇷 فارسی](README_FA.md)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/HunterHill13/medical-lecture-transcriber/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=تست‌های%20خودکار%20CI)](https://github.com/HunterHill13/medical-lecture-transcriber/actions)
-[![Tests](https://img.shields.io/badge/تست‌ها-۱۲۸%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
+[![Tests](https://img.shields.io/badge/تست‌ها-۱۳۱%20پاس%20شده-success?style=for-the-badge&logo=pytest)](tests/)
 [![Python](https://img.shields.io/badge/پایتون-۳.۱۱%2B-blue?style=for-the-badge&logo=python)](https://python.org)
-[![Version](https://img.shields.io/badge/نسخه-۵.۷.۰-orange?style=for-the-badge)](scripts/version.py)
+[![Version](https://img.shields.io/badge/نسخه-۵.۷.۱-orange?style=for-the-badge)](scripts/version.py)
 [![License](https://img.shields.io/badge/مجوز-MIT-green?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/گوگل%20آنتی‌گرویتی-سازگار-blueviolet?style=for-the-badge)](https://antigravity.google)
 

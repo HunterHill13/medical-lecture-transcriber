@@ -308,4 +308,52 @@ def test_build_pamphlet_renders_table_structural_advisory_on_missing_table_data(
     assert "تذکر ساختاری: اسلاید اصلی حاوی جدول است" in all_text
 
 
+def test_run_pipeline_args_forwarding(monkeypatch, tmp_path):
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that run_pipeline.py properly forwards --img-dir to verify_slide_alignment.py
+    and --raw to create_slide_pamphlet.py.
+    """
+    import run_pipeline
+    import argparse
 
+    commands_executed = []
+    def fake_run_cmd(cmd_list, description=""):
+        commands_executed.append(cmd_list)
+        return True
+
+    monkeypatch.setattr(run_pipeline, "run_cmd", fake_run_cmd)
+
+    # 1. Test cmd_verify_slides forwarding --img-dir
+    raw_f = str(tmp_path / "raw.json")
+    trans_f = str(tmp_path / "trans.json")
+    with open(raw_f, "w") as f: f.write("[]")
+    with open(trans_f, "w") as f: f.write("[]")
+
+    args_v = argparse.Namespace(
+        raw=raw_f,
+        translated=trans_f,
+        auto_fix=False,
+        ref_corpus=None,
+        allow_review=False,
+        img_dir="./custom_images"
+    )
+    run_pipeline.cmd_verify_slides(args_v)
+    last_cmd = commands_executed[-1]
+    assert "--img-dir" in last_cmd, f"Expected --img-dir to be forwarded in verify_slide_alignment command, got: {last_cmd}"
+    assert "./custom_images" in last_cmd
+
+    # 2. Test cmd_build forwarding --raw
+    args_b = argparse.Namespace(
+        translated=trans_f,
+        output="out.docx",
+        img_dir="./custom_images",
+        title="Custom Title",
+        ref_book="هاریسون",
+        verify=False,
+        raw=raw_f
+    )
+    run_pipeline.cmd_build(args_b)
+    last_build_cmd = commands_executed[-1]
+    assert "--raw" in last_build_cmd, f"Expected --raw to be forwarded in create_slide_pamphlet command, got: {last_build_cmd}"
+    assert raw_f in last_build_cmd

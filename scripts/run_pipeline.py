@@ -178,6 +178,11 @@ def cmd_verify_slides(args):
         cmd.extend(["--ref-corpus", args.ref_corpus])
     if getattr(args, "allow_review", False):
         cmd.append("--allow-review")
+    img_dir = getattr(args, "img_dir", None)
+    if not img_dir and os.path.isdir("slide_images"):
+        img_dir = "slide_images"
+    if img_dir:
+        cmd.extend(["--img-dir", img_dir])
     return 0 if run_cmd(cmd, "Running Slide Alignment & Index Invariance Verification Gate") else 1
 
 def cmd_verify_lecture(args):
@@ -231,6 +236,11 @@ def cmd_build(args):
         cmd.extend(["--title", args.title])
     if args.ref_book:
         cmd.extend(["--ref-book", args.ref_book])
+    raw_path = getattr(args, "raw", None) or getattr(args, "raw_slides", None)
+    if not raw_path and os.path.isfile("raw_slides.json"):
+        raw_path = "raw_slides.json"
+    if raw_path and os.path.isfile(raw_path):
+        cmd.extend(["--raw", raw_path])
     build_ok = run_cmd(cmd, f"Compiling publication-grade Word study guide to {output}")
     if not build_ok:
         return 1
@@ -348,6 +358,7 @@ def main():
     p_vslides.add_argument("--translated", default="translated_slides.json", help="Path to translated_slides.json")
     p_vslides.add_argument("--auto-fix", action="store_true", help="Auto-fix missing slide gaps")
     p_vslides.add_argument("--ref-corpus", help="Optional path to reference book corpus for ref_note grounding verification")
+    p_vslides.add_argument("--img-dir", default=None, help="Directory containing slide images for visual asset audit")
 
     # verify-lecture
     p_vlecture = subparsers.add_parser("verify-lecture", help="Validate audio timestamps and substantive density")
@@ -369,6 +380,7 @@ def main():
     p_verify.add_argument("--transcripts-dir", default="transcripts")
     p_verify.add_argument("--raw-slides", default="raw_slides.json")
     p_verify.add_argument("--ref-corpus", help="Optional path to reference book corpus")
+    p_verify.add_argument("--img-dir", default=None, help="Directory containing slide images for visual asset audit")
     p_verify.add_argument("--min-chunk-duration", type=int, default=30)
     p_verify.add_argument("--strict-drift", action="store_true", help="Enforce strict 60-second drift cap regardless of lecture length")
     p_verify.add_argument("--max-drift", type=int, default=None, help="Explicit maximum allowed drift seconds")

@@ -980,6 +980,73 @@ def test_smart_text_slide_screenshot_guard_suppresses_full_page_screenshot(tmp_p
     assert "<w:drawing" in s5_xml, "Expected standalone figure to be embedded in mixed slide 5"
 
 
+def test_convert_image_to_png_subprocess_fallback(monkeypatch):
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that extract_presentation.convert_image_to_png has subprocess defined and
+    correctly invokes the Windows native fallback when Pillow and PyMuPDF fail.
+    Prior to fix, missing 'import subprocess' in extract_presentation caused a silent NameError.
+    """
+    import extract_presentation as ep
+    from unittest.mock import patch, MagicMock
+
+    with tempfile.NamedTemporaryFile(suffix=".wmf", delete=False) as tf:
+        tf.write(b"fake wmf vector")
+        wmf_path = tf.name
+    dst_png = wmf_path + ".png"
+
+    # Mock Pillow to fail, PyMuPDF to fail, and platform to win32
+    monkeypatch.setattr(ep.sys, "platform", "win32")
+    
+    mock_run = MagicMock()
+    # Mock subprocess.run
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    with patch("PIL.Image.open", side_effect=Exception("Pillow unsupported")):
+        with patch("pymupdf.open", side_effect=Exception("MuPDF unsupported")):
+            # Simulate PowerShell saving the file
+            def fake_run(cmd, **kwargs):
+                with open(dst_png, "wb") as f_out:
+                    f_out.write(b"\x89PNG\r\n\x1a\n")
+                return MagicMock(returncode=0)
+            mock_run.side_effect = fake_run
+
+            res = ep.convert_image_to_png(wmf_path, dst_png)
+            assert res == dst_png
+            assert mock_run.called, "subprocess.run should have been called for Windows PowerShell native conversion"
+
+    if os.path.exists(wmf_path):
+        os.remove(wmf_path)
+    if os.path.exists(dst_png):
+        os.remove(dst_png)
+
+
+def test_extract_pptx_with_group_shapes():
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that extract_pptx recursively unrolls MSO_SHAPE_TYPE.GROUP shapes so that
+    diagram labels, text frames, and pictures inside grouped shapes are not dropped.
+    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pptx_path = os.path.join(tmp_dir, "test_group.pptx")
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        
+        # Add a grouped shape with a text box inside
+        group = slide.shapes.add_group_shape()
+        tb = group.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(2))
+        tb.text_frame.text = "Pathophysiology and Diagnostic Criteria for Cushing Syndrome"
+        prs.save(pptx_path)
+
+        slides = extract_pptx(pptx_path, img_dir=tmp_dir)
+        assert len(slides) == 1
+        meta = slides[0]
+        # Text inside group shape MUST be extracted into text_lines
+        assert any("Cushing Syndrome" in line for line in meta["text_lines"]), (
+            f"Expected text inside grouped shape to be extracted, got: {meta['text_lines']}"
+        )
+
+
 
 
 
