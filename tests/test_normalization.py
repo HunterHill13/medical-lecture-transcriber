@@ -330,3 +330,84 @@ def test_sanitize_ref_note_preserves_clean_text():
         assert has_ref_note_prefix(text) is False
         assert sanitize_ref_note(text) == text
 
+
+def test_sanitize_latex_math_inequalities_and_delimiters():
+    from text_utils import sanitize_latex_math
+
+    cases = [
+        (r"$\ ge   1.0 $", "≥ 1.0"),
+        (r"$\ge 1.0$", "≥ 1.0"),
+        (r"$ \ge 1.0 $", "≥ 1.0"),
+        (r"\ge 1.0", "≥ 1.0"),
+        (r"\geq 1.0", "≥ 1.0"),
+        (r"\ge1.0", "≥ 1.0"),
+        (r"$\ le   0.5 $", "≤ 0.5"),
+        (r"\le 0.5", "≤ 0.5"),
+        (r"\leq 0.5", "≤ 0.5"),
+        (r"\le0.5", "≤ 0.5"),
+        (r"$\pm 2.5$", "± 2.5"),
+        (r"\pm5%", "± 5%"),
+        (r"$\approx 50\%$", "≈ 50%"),
+        (r"$\neq 0$", "≠ 0"),
+        (r"10 \times 10^3", "10 × 10³"),
+        (r"\[ \ge 1.0 \]", "≥ 1.0"),
+        (r"\( \le 2.0 \)", "≤ 2.0"),
+        (r"$\sim 5$", "~ 5")
+    ]
+
+    for raw, expected in cases:
+        assert sanitize_latex_math(raw) == expected
+
+
+def test_sanitize_latex_math_units_and_greek():
+    from text_utils import sanitize_latex_math
+
+    assert sanitize_latex_math(r"$\alpha$-blocker و $\beta$-blocker") == "α-blocker و β-blocker"
+    assert sanitize_latex_math(r"قطر ندول $\ ge 1.0 \text{ cm}$ می باشد") == "قطر ندول ≥ 1.0 cm می باشد"
+    assert sanitize_latex_math(r"Ca^{2+} و HCO_{3}^-") == "Ca²⁺ و HCO₃⁻"
+    assert sanitize_latex_math(r"25^\circ C و \approx 50%") == "25° C و ≈ 50%"
+    assert sanitize_latex_math(r"\mu\text{g/dL}") == "µg/dL"
+
+
+def test_clean_markdown_text_with_latex():
+    from text_utils import clean_markdown_text
+
+    raw = r"- اندازه ندول: $\ ge   1.0 $ سانتیمتر و دوز مصرفی: $\le 10\text{ mg}$"
+    expected = "اندازه ندول: ≥ 1.0 سانتیمتر و دوز مصرفی: ≤ 10 mg"
+    assert clean_markdown_text(raw) == expected
+
+
+def test_normalize_for_display_with_latex():
+    from text_utils import normalize_for_display
+
+    raw = "بیمار با سطح TSH $\\le 0.5$ و سایز ندول $\\ ge 1.0 $ سانتیمتر مراجعه کرد."
+    res = normalize_for_display(raw)
+    assert "≤ 0.5" in res
+    assert "≥ 1.0" in res
+    assert "$" not in res
+    assert "\\" not in res
+
+
+def test_table_cell_latex_sanitization_in_docx():
+    import docx
+    from create_slide_pamphlet import render_reference_table
+
+    doc = docx.Document()
+    headers = ["شاخص بالینی", "معیار کات‌آف"]
+    rows = [
+        ["قطر ندول تیروئید", r"$\ ge   1.0 $"],
+        ["دوز کورتیکواستروئید", r"$\le 5\text{ mg/day}$"],
+        ["انحراف معیار", r"$\pm 2.5$"]
+    ]
+    t = render_reference_table(doc, headers, rows)
+    # Check cell text in table
+    cell_val_1 = t.cell(1, 1).text.strip()
+    cell_val_2 = t.cell(2, 1).text.strip()
+    cell_val_3 = t.cell(3, 1).text.strip()
+
+    assert cell_val_1 == "≥ 1.0"
+    assert cell_val_2 == "≤ 5 mg/day"
+    assert cell_val_3 == "± 2.5"
+    assert "$" not in cell_val_1
+    assert "\\" not in cell_val_1
+

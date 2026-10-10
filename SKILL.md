@@ -1,31 +1,33 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.7.2): enforces Multi-Format Resilient Table Rendering
-  Engine (renders both 2D raw list rows and dict rows in Word with automatic column width safety and zero IndexError), Cloud-Native
-  Exponential Backoff Audio Transcription Retry Protocol (handles HTTP 429 quota exhaustion and network timeouts gracefully), PowerPoint
-  Group Shape Unrolling Engine (iter_slide_shapes recursively expands MSO_SHAPE_TYPE.GROUP so grouped diagrams and text boxes are fully preserved),
-  Native Image Conversion Subprocess Recovery (fixes Windows System.Drawing fallback for WMF/EMF/TIFF/BMP conversion), Unified Pipeline CLI
-  Argument Forwarding (auto-forwards --img-dir and --raw across verification and build stages), Slide Numerical & Statistical Data Preservation
-  Gate (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological ratios like '5 in 10,000', statistical
-  percentages like '0.5-2%', ranges, and cohort ages without qualitative generalization), Presentation Text Sanitization & Encoding Recovery
-  Engine (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF extraction), Smart Visual
-  Asset Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure
-  clinical diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English
-  screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic
-  cell-by-cell table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory
-  hallucination of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
-  UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Universal Reference Note Sanitization &
-  Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator Filtering
-  (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts
-  WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence
-  Audit Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local STT/Whisper/CUDA downloads),
-  Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance
-  Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering,
-  Automated 133-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Publication-grade medical study guide and lecture transcription workflow (v5.7.3): enforces Universal LaTeX Math & Scientific Symbol
+  Sanitization Engine (converts LaTeX math delimiters and symbols like '$\ ge 1.0 $', '\ge', '\le', '\pm', '\times' into standard Unicode
+  characters '≥', '≤', '±', '×', '°', 'µ' across slide boxes, bullets, and table cells with zero BiDi distortion), Multi-Format Resilient
+  Table Rendering Engine (renders both 2D raw list rows and dict rows in Word with automatic column width safety and zero IndexError),
+  Cloud-Native Exponential Backoff Audio Transcription Retry Protocol (handles HTTP 429 quota exhaustion and network timeouts gracefully),
+  PowerPoint Group Shape Unrolling Engine (iter_slide_shapes recursively expands MSO_SHAPE_TYPE.GROUP so grouped diagrams and text boxes
+  are fully preserved), Native Image Conversion Subprocess Recovery (fixes Windows System.Drawing fallback for WMF/EMF/TIFF/BMP conversion),
+  Unified Pipeline CLI Argument Forwarding (auto-forwards --img-dir and --raw across verification and build stages), Slide Numerical &
+  Statistical Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological ratios like
+  '5 in 10,000', statistical percentages like '0.5-2%', ranges, and cohort ages without qualitative generalization), Presentation Text
+  Sanitization & Encoding Recovery Engine (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF
+  extraction), Smart Visual Asset Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template
+  backgrounds; extracts pure clinical diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard
+  suppressing redundant English screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA
+  strictly enforce atomic cell-by-cell table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT
+  prevents parametric memory hallucination of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts
+  parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Universal Reference
+  Note Sanitization & Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept
+  Denominator Filtering (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart
+  Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata
+  Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local
+  STT/Whisper/CUDA downloads), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
+  Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
+  Visual-Aware OCR Triggering, Automated 139-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.7.2)
+# Medical Lecture Transcriber & Study Guide Generator (v5.7.3)
 
 ## Overview
 
@@ -58,6 +60,7 @@ Every agent implementing this skill **MUST** strictly adhere to the following co
 | **Reference Banners** | Dubai | 11pt | Bold | Fill `#4A709C` (Slate Blue), Text `#FFFFFF` | Merged across all table columns |
 | **Student Review Badge** | Dubai | 10.5pt | Bold | Fill `#FEF9E7`, Border `#D35400` (Amber) | `⚠️ برچسب بازبینی دانشجو (اسلاید X...): ` |
 | **Classroom Q&A Box** | Dubai | 10.5pt | Bold | Fill `#FBF9FD`, Right Border `#6C3483` (36) | `❓ پرسش کلاسی:` `#6C3483`, `💡 پاسخ استاد:` `#1E8449` |
+| **Scientific & Math Notation** | Dubai | 10.5pt/11pt | Direct Unicode | `#262626` (Charcoal) | Strictly prohibit LaTeX math ($...$, \ge, \le). Enforce native Unicode (≥, ≤, ±, ×, °, µ, ², ³, →). |
 
 ---
 
@@ -232,24 +235,34 @@ uv run python scripts/verify_slide_alignment.py --raw raw_slides.json --translat
 
 ---
 
-### J. Bidirectional (BiDi) Text Sanitization & Preservation of Scientific Notation (مسیرهای بیوشیمیایی و فرمول‌ها)
+### J. Bidirectional (BiDi) Text Sanitization & Universal Unicode Math Engine (مسیرهای بیوشیمیایی، فرمول‌ها و پالایش نمادهای لاتک)
 1. **Preservation of Scientific Pathways & Equations:**
    - **Biochemical pathways and cascades:** `GPCR -> Gs -> Adenylyl Cyclase -> cAMP -> PKA`
    - **Chemical & physiological equations:** `CO2 + H2O <-> H2CO3 <-> H+ + HCO3-`
    - **Receptor notation & laboratory ranges:** `D2 -> Gi -> ↓cAMP`, `TSH > 10 mIU/L`, `Ca < 8.5 mg/dL`
-   - **CRITICAL RULE:** Do NOT replace scientific arrows (`->`, `<->`) or inequality signs (`<`, `>`) with Persian words in chemical/biochemical notation!
-   - Every scientific pathway, formula, unit (`mg/kg/day`), or dosage **MUST** be isolated inside an explicit `<w:rtl w:val="0"/>` LTR run so Microsoft Word preserves its exact directionality without character flipping.
-2. **Narrative Text Arrow Sanitization:**
+   - **CRITICAL RULE:** Do NOT replace scientific arrows (`->`, `<->`) or inequality signs (`<`, `>`, `≥`, `≤`) with Persian words in chemical/biochemical notation!
+   - Every scientific pathway, formula, unit (`mg/kg/day`), dosage, or inequality **MUST** be isolated inside an explicit `<w:rtl w:val="0"/>` LTR run so Microsoft Word preserves its exact directionality without character flipping.
+2. **Strict Prohibition of LaTeX Math Syntax & Universal Unicode Enforcement (منع مطلق لاتک و الزام یونیکد مستقیم):**
+   - **قانون خط قرمز نمادگذاری ریاضی و آزمایشگاهی:** نگارش عبارات ریاضی و آزمایشگاهی به فرمت لاتک (نظیر `$ ... $`، `\ge`، `\le`، `\pm`، `\times`، `\alpha`، `\mu`) در تمام فیلدهای JSON (`bullets`، `table_data`، `spoken_lecture`، `ref_note`) **اکیداً ممنوع** است!
+   - **الزام کاراکترهای مستقیم یونیکد:** همواره مستقیماً از کاراکترهای استاندارد یونیکد استفاده کنید:
+     - به جای `$\ ge   1.0 $` یا `$\ge 1.0$` بنویسید: `≥ 1.0` (یا `>= 1.0`)
+     - به جای `$\le 0.5$` یا `\le 0.5` بنویسید: `≤ 0.5` (یا `<= 0.5`)
+     - به جای `\pm 2.5` یا `$\pm 2.5$` بنویسید: `± 2.5`
+     - به جای `10 \times 10^3` بنویسید: `10 × 10³`
+     - به جای `Ca^{2+}` بنویسید: `Ca²⁺`
+     - به جای `\mu\text{g/dL}` بنویسید: `µg/dL`
+   - **موتور پالایش خودکار پایپ‌لاین (`sanitize_latex_math`):** موتور پردازشگر متن به صورت خودکار تمام متون ورودی، بالت‌ها و خانه‌های جدول را قبل از درج در Word و اعتبارسنجی گیت‌ها پالایش نموده و هرگونه نشانه‌گذاری لاتک تصادفی را به نمادهای تمیز یونیکد تبدیل می‌کند تا از به هم ریختگی جهت متن (BiDi Inversion) در فایل Word جلوگیری شود.
+3. **Narrative Text Arrow Sanitization:**
    - In ordinary conversational prose (e.g. «استرس -> ترشح کورتیزول»), replace volatile symbols with Persian words («استرس منجر به ترشح کورتیزول می‌شود»).
-3. **Isolate Latin Acronyms in `w:rtl="0"` Runs:**
-   - Split paragraphs using regex: `re.split(r'(\([A-Za-z0-9_\-\s,\./%αβγ><=↓↑]+\))', text)`.
+4. **Isolate Latin Acronyms in `w:rtl="0"` Runs:**
+   - Split paragraphs using regex: `re.split(r'(\([A-Za-z0-9_\-\s,\./%αβγ><=≥≤≈≠±×°µ↓↑]+\))', text)`.
    - Every English parenthetical run `(GPCR)`, `(ITT/OGTT)`, `(IGFBP-3)` MUST be set with `<w:rtl w:val="0"/>`.
-4. **Strict No-Footnotes Policy:**
+5. **Strict No-Footnotes Policy:**
    - All medical abbreviations and Latin terms must appear inline in parentheses: e.g. `پرولاکتینوما (Prolactinoma)`. Zero bottom-of-page footnotes!
 
 ---
 
-### J. Gemini Multimodal Audio Transcription Protocol & Strict Local STT Prohibition (پروتکل پیاده‌سازی صوت با جمینای و منع اکید نصب لوکال Whisper/CUDA)
+### K. Gemini Multimodal Audio Transcription Protocol & Strict Local STT Prohibition (پروتکل پیاده‌سازی صوت با جمینای و منع اکید نصب لوکال Whisper/CUDA)
 
 > ⛔ **قانون حیاتی و خط قرمز سیستم (STRICT PROHIBITION):**
 > هیچ ایجنتی تحت هیچ شرایطی حق ندارد پکیج‌های سنگین لوکال نظیر `whisper`، `faster-whisper`، `torch`، `nvidia-cudnn`، `nvidia-cublas`، `ctranslate2` یا بسته‌های درایور CUDA را دانلود، نصب یا اجرا کند!

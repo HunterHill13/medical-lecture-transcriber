@@ -73,16 +73,129 @@ STOPWORDS = {
     "ارگانش", "ازمایشات", "استاندارد", "اسلایدها"
 }
 
+# Superscript & Subscript character conversion maps
+SUPERSCRIPT_CHAR_MAP = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+    '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾',
+    'n': 'ⁿ'
+}
+SUBSCRIPT_CHAR_MAP = {
+    '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+    '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+    '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎',
+    'a': 'ₐ', 'e': 'ₑ', 'o': 'ₒ', 'x': 'ₓ'
+}
+
+LATEX_MATH_SYMBOL_REPLACEMENTS = [
+    # Inequalities and approximations (with optional space after backslash and lookahead safety)
+    (r'\\\s*(?:geq|ge)(?![a-zA-Z])', '≥'),
+    (r'\\\s*(?:leq|le)(?![a-zA-Z])', '≤'),
+    (r'\\\s*pm(?![a-zA-Z])', '±'),
+    (r'\\\s*mp(?![a-zA-Z])', '∓'),
+    (r'\\\s*times(?![a-zA-Z])', '×'),
+    (r'\\\s*cdot(?![a-zA-Z])', '·'),
+    (r'\\\s*(?:div|divided)(?![a-zA-Z])', '÷'),
+    (r'\\\s*approx(?![a-zA-Z])', '≈'),
+    (r'\\\s*(?:neq|ne)(?![a-zA-Z])', '≠'),
+    (r'\\\s*sim(?![a-zA-Z])', '~'),
+    (r'\\\s*ll(?![a-zA-Z])', '≪'),
+    (r'\\\s*gg(?![a-zA-Z])', '≫'),
+    (r'\\\s*equiv(?![a-zA-Z])', '≡'),
+    # Arrows
+    (r'\\\s*(?:to|rightarrow|longrightarrow)(?![a-zA-Z])', '→'),
+    (r'\\\s*(?:leftarrow|longleftarrow)(?![a-zA-Z])', '←'),
+    (r'\\\s*leftrightarrow(?![a-zA-Z])', '↔'),
+    (r'\\\s*Rightarrow(?![a-zA-Z])', '⇒'),
+    (r'\\\s*Leftarrow(?![a-zA-Z])', '⇐'),
+    (r'\\\s*Leftrightarrow(?![a-zA-Z])', '⇔'),
+    (r'\\\s*uparrow(?![a-zA-Z])', '↑'),
+    (r'\\\s*downarrow(?![a-zA-Z])', '↓'),
+    # Scientific constants / units
+    (r'\\\s*infty(?![a-zA-Z])', '∞'),
+    (r'\\\s*(?:micro|mu)(?![a-zA-Z])|\\\s*(?:micro|mu)(?=[gmL]|mol)', 'µ'),
+    # Greek letters
+    (r'\\\s*alpha(?![a-zA-Z])', 'α'),
+    (r'\\\s*beta(?![a-zA-Z])', 'β'),
+    (r'\\\s*gamma(?![a-zA-Z])', 'γ'),
+    (r'\\\s*Delta(?![a-zA-Z])', 'Δ'),
+    (r'\\\s*delta(?![a-zA-Z])', 'δ'),
+    (r'\\\s*epsilon(?![a-zA-Z])', 'ε'),
+    (r'\\\s*theta(?![a-zA-Z])', 'θ'),
+    (r'\\\s*lambda(?![a-zA-Z])', 'λ'),
+    (r'\\\s*sigma(?![a-zA-Z])', 'σ'),
+    (r'\\\s*omega(?![a-zA-Z])', 'ω'),
+    (r'\\\s*Omega(?![a-zA-Z])', 'Ω'),
+    (r'\\\s*pi(?![a-zA-Z])', 'π'),
+]
+
+def sanitize_latex_math(text: str) -> str:
+    """
+    Sanitizes LaTeX math notations, inequalities, and delimiters into publication-ready Unicode:
+    - Normalizes inline/display math delimiters: '$ ... $', '$$ ... $$', '\\( ... \\)', '\\[ ... \\]'
+    - Converts LaTeX inequalities and symbols: '\\ge'/'\\geq' -> '≥', '\\le'/'\\leq' -> '≤',
+      including variations with stray spaces like '$\\ ge   1.0 $'
+    - Converts operators: '\\pm' -> '±', '\\times' -> '×', '\\approx' -> '≈', '\\neq' -> '≠', '\\div' -> '÷'
+    - Converts Greek letters: '\\alpha' -> 'α', '\\beta' -> 'β', '\\mu' -> 'µ', etc.
+    - Converts scientific degree and superscripts/subscripts: '^\\circ'/'\\degree' -> '°',
+      '^2' -> '²', '^3' -> '³', 'Ca^{2+}' -> 'Ca²⁺', 'HCO_{3}^-' -> 'HCO₃⁻'
+    - Extracts text wrappers: '\\text{...}', '\\mathrm{...}', '\\mathbf{...}'
+    - Converts simple fractions: '\\frac{a}{b}' -> '(a / b)'
+    - Cleans LaTeX escaped symbols (\\%, \\$, \\_, \\&) and unclosed dollar signs.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    t = str(text)
+
+    # 1. Math symbols with optional spaces after backslash (e.g. \ge, \ ge, \  geq)
+    for pat, rep in LATEX_MATH_SYMBOL_REPLACEMENTS:
+        t = re.sub(pat, rep, t)
+
+    # 2. LaTeX wrappers like \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}
+    t = re.sub(r'\\(?:text|mathrm|mathbf|mathit)\s*\{([^}]*)\}', r'\1', t)
+
+    # 3. Fractions \frac{a}{b} -> (a / b)
+    t = re.sub(r'\\frac\s*\{([^}]*)\}\s*\{([^}]*)\}', r'(\1 / \2)', t)
+
+    # 4. Superscripts, subscripts, degree
+    t = re.sub(r'\^\{\s*\\circ\s*\}|\^\\circ|\\degree(?![a-zA-Z])', '°', t)
+    t = re.sub(r'\^\{([0-9\+\-n\(\)]+)\}', lambda m: ''.join(SUPERSCRIPT_CHAR_MAP.get(c, c) for c in m.group(1)), t)
+    t = re.sub(r'\_\{([0-9\+\-\(\)]+)\}', lambda m: ''.join(SUBSCRIPT_CHAR_MAP.get(c, c) for c in m.group(1)), t)
+    t = re.sub(r'\^([0-9\+\-n])', lambda m: SUPERSCRIPT_CHAR_MAP.get(m.group(1), m.group(0)), t)
+
+    # 5. Spacing around relational/operator symbols when glued directly to digits
+    t = re.sub(r'(?<=[≥≤≈≠±])(?=\d)', ' ', t)
+
+    # 6. Delimiters \( ... \), \[ ... \], $$ ... $$, $ ... $
+    t = re.sub(r'\\\[(.*?)\\\]', r'\1', t)
+    t = re.sub(r'\\\((.*?)\\\)', r'\1', t)
+    t = re.sub(r'\$\$(.*?)\$\$', r'\1', t)
+    t = re.sub(r'\$(.*?)\$', r'\1', t)
+
+    # 7. Escaped LaTeX characters and stray delimiters
+    t = t.replace(r'\%', '%')
+    t = t.replace(r'\&', '&')
+    t = t.replace(r'\_', '_')
+    t = t.replace(r'\[', '').replace(r'\]', '')
+    t = t.replace(r'\(', '').replace(r'\)', '')
+    t = t.replace('$', '')
+
+    # 8. Collapse redundant spaces
+    t = re.sub(r'[ \t]+', ' ', t)
+    return t.strip()
+
 def normalize_for_display(text: str) -> str:
     """
     Normalizes Persian text for publication display:
     - Normalizes basic character encodings (ك -> ک, ي -> ی, ة -> ه)
+    - Converts LaTeX math notation ($...$, \\ge, \\pm, etc.) to clean Unicode
     - STRICTLY PRESERVES correct orthography (does NOT alter 'آ' or 'ئ')
     - STRICTLY PRESERVES scientific notation, arrows (→, ⇌, <->), chemical formulas,
       Greek letters (α, β, γ), sub/superscripts (Ca²⁺, HCO₃⁻), inequalities, and punctuation.
     """
     if not text:
         return ""
+    text = sanitize_latex_math(text)
     for src, dst in DISPLAY_CHAR_REPLACEMENTS.items():
         text = text.replace(src, dst)
     # Strip diacritics / tashkeel / harakat
@@ -94,6 +207,7 @@ def normalize_for_display(text: str) -> str:
 def sanitize_presentation_text(text: str) -> str:
     """
     Sanitizes presentation text from PPTX/PDF extraction:
+    - Normalizes LaTeX math notation and delimiters (e.g. $\\ ge 1.0 $ -> ≥ 1.0)
     - Normalizes replacement character \ufffd in numeric ranges (e.g. 2\ufffd5% -> 2-5%)
     - Unifies Unicode dashes (en-dash, em-dash, non-breaking hyphen, minus sign) to standard '-'
     - Unifies curly/smart quotes to standard quotes
@@ -101,8 +215,11 @@ def sanitize_presentation_text(text: str) -> str:
     """
     if not text:
         return ""
+    # 0. Sanitize LaTeX math artifacts
+    t = sanitize_latex_math(str(text))
+    
     # 1. Normalize non-breaking space
-    t = str(text).replace('\u00a0', ' ')
+    t = t.replace('\u00a0', ' ')
     
     # 2. Convert Unicode dashes to standard hyphen
     # \u2010 (hyphen), \u2011 (non-breaking hyphen), \u2012 (figure dash),
@@ -1092,8 +1209,8 @@ def extract_clinical_facts(text: str) -> dict:
     pct_matches = re.findall(r'(\d+(?:\.\d+)?)\s*(?:%|٪|درصد)', norm_text)
     percentages = {f"{m}%" for m in pct_matches}
     
-    # 2. Dosages & medical quantities
-    dosage_pattern = r'(\d+(?:\.\d+)?)\s*(mg|mcg|μg|ug|g|gr|ml|cc|iu|meq|میلی[\s‌]گرم|میکروگرم|گرم|سی[\s‌]سی|واحد)'
+    # 2. Dosages & medical quantities (including clinical sizes cm/mm)
+    dosage_pattern = r'(\d+(?:\.\d+)?)\s*(mg|mcg|μg|ug|g|gr|ml|cc|iu|meq|cm|mm|میلی[\s‌]گرم|میکروگرم|گرم|سی[\s‌]سی|واحد|سانتی[\s‌]متر|سانتیمتر|میلی[\s‌]متر|میلیمتر)'
     dosages = set()
     for val, unit in re.findall(dosage_pattern, norm_text):
         unit_clean = unit.replace(" ", "").replace("\u200c", "")
@@ -1109,6 +1226,10 @@ def extract_clinical_facts(text: str) -> dict:
             norm_unit = "iu"
         elif unit_clean in ("meq",):
             norm_unit = "meq"
+        elif unit_clean in ("سانتیمتر", "cm"):
+            norm_unit = "cm"
+        elif unit_clean in ("میلیمتر", "mm"):
+            norm_unit = "mm"
         else:
             norm_unit = unit_clean
         dosages.add(f"{val} {norm_unit}")
@@ -1121,7 +1242,7 @@ def extract_clinical_facts(text: str) -> dict:
         lab_values.add(f"{sys_bp}/{dia_bp} mmhg")
         
     # Single lab units
-    lab_unit_pat = r'(\d+(?:\.\d+)?)\s*(mmhg|mmol/l|meq/l|mg/dl|c|درجه|سانتی[\s‌]گراد)'
+    lab_unit_pat = r'(\d+(?:\.\d+)?)\s*(mmhg|mmol/l|meq/l|mg/dl|°\s*c|c\b|درجه|سانتی[\s‌]گراد)'
     for val, unit in re.findall(lab_unit_pat, norm_text):
         if "c" in unit or "درجه" in unit or "سانتی" in unit:
             lab_values.add(f"{val} c")
@@ -1209,11 +1330,12 @@ def compare_clinical_facts(audio_facts: dict, slide_facts: dict) -> dict:
 def clean_markdown_text(text: str) -> str:
     """
     Cleans raw markdown artifacts (*, #, __) and template headings from text,
-    reflowing soft-breaks into clean prose without internal newlines.
+    normalizes LaTeX math notations into Unicode, and reflows soft-breaks
+    into clean prose without internal newlines.
     """
     if not text:
         return ""
-    text = str(text)
+    text = sanitize_latex_math(str(text))
     # Strip template headers
     generic_header_re = re.compile(
         r'(?m)^#{1,6}\s*(?:بیانات استاد|تدریس استاد|تدریس کلاسی|بیانات کلاسی|متن پیاده\s*سازی|'
@@ -1234,12 +1356,14 @@ def clean_markdown_text(text: str) -> str:
 def parse_inline_spans(text: str, default_bold: bool = False, default_italic: bool = False) -> List[dict]:
     """
     Parses a single line of text into inline text runs, extracting markdown bold (**...**)
-    and italic (*...*), stripping markdown symbols, and ensuring zero newlines in runs.
+    and italic (*...*), sanitizing LaTeX math notation to Unicode, stripping markdown symbols,
+    and ensuring zero newlines in runs.
     """
     if not text:
         return []
+    text = sanitize_latex_math(str(text))
     # Replace internal newlines with space
-    text = str(text).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+    text = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
     text = re.sub(r'  +', ' ', text).strip()
     if not text:
         return []
@@ -1404,14 +1528,15 @@ def has_ref_note_prefix(text: str) -> bool:
 
 def sanitize_ref_note(text: str) -> str:
     """
-    Strips redundant lead titles, book citations, and emojis from reference notes.
+    Strips redundant lead titles, book citations, and emojis from reference notes,
+    and sanitizes LaTeX math notation into Unicode.
     Ensures that ref_note contains pure substantive scientific commentary so that
     Word rendering does not result in duplicate titles (Dual Prepending).
     Handles repeated prefix injections and leading emojis safely.
     """
     if not text or not isinstance(text, str):
         return ""
-    cleaned = text.strip()
+    cleaned = sanitize_latex_math(text.strip())
     while True:
         m = REF_NOTE_PREFIX_PATTERN.match(cleaned)
         if m and m.end() > 0:

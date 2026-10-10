@@ -2096,6 +2096,36 @@ def test_slide_numerical_data_omission_passes_when_statistics_preserved():
     assert len(errors) == 0, f"Expected 0 errors for faithful Slide 8, got: {errors}"
 
 
+def test_latex_math_in_slide_pair_verification():
+    raw_slide = {
+        "slide_number": 9,
+        "title": "Adrenal Incidentaloma Management",
+        "text_lines": [
+            "Adrenal Incidentaloma Criteria",
+            "Nodule diameter >= 1.0 cm",
+            "Cortisol cut-off >= 1.8 mcg/dL"
+        ]
+    }
+    trans_slide = {
+        "slide_number": 9,
+        "title_fa": "مدیریت اینسیدنتالوماهای آدرنال",
+        "title_en": "Adrenal Incidentaloma Management",
+        "bullets": [
+            {
+                "lead": "معیار سایز ندول:",
+                "text": r"بررسی بالینی در ندول با قطر $\ ge   1.0 $ سانتیمتر توصیه می‌شود."
+            },
+            {
+                "lead": "کات‌آف کورتیزول:",
+                "text": r"سطح کورتیزول سرم $\ge 1.8\text{ mcg/dL}$ نشان‌دهنده ترشح خودمختار است."
+            }
+        ]
+    }
+    issues = check_slide_pair(raw_slide, trans_slide)
+    errors = [i for i in issues if i.get("severity") == "error"]
+    assert len(errors) == 0, f"Expected 0 errors for LaTeX-sanitized slide pair, got: {errors}"
+
+
 
 
 

@@ -46,7 +46,8 @@ from text_utils import (
     parse_inline_spans,
     parse_markdown_blocks,
     flatten_spoken_lecture,
-    sanitize_ref_note
+    sanitize_ref_note,
+    sanitize_latex_math
 )
 
 def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
@@ -252,19 +253,22 @@ def add_r(p, text, font_name="Dubai", size_pt=11, bold=False, italic=False, colo
 def add_bidi_text(p, text, font_name="Dubai", size_pt=10.5, bold=False, italic=False, color_rgb=(0x26, 0x26, 0x26)):
     """
     Renders mixed Persian/English scientific text with strict BiDi isolation.
-    Preserves arrows (→, ⇌, <->, ->), chemical formulas (Ca²⁺, HCO₃⁻), inequalities (p < 0.05),
+    Preserves arrows (→, ⇌, <->, ->), chemical formulas (Ca²⁺, HCO₃⁻), inequalities (p < 0.05, ≥ 1.0, ≤ 0.5),
     and Latin abbreviations without converting scientific symbols to Persian prose.
     """
     if not text:
         return
-    text = str(text).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
-    pattern = r'(\([A-Za-z0-9_\-\s,\./%α-ωΑ-Ω→⇌⇄<>=\+\^±]+\)|[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±]+(?:\s*(?:→|->|⇌|<->|⇄|<=|>=|<|>|=)\s*[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±]+)+|[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±]{2,}|[→⇌⇄]|(?:<=|>=|[<>=])\s*\d+(?:\.\d+)?)'
+    text = sanitize_latex_math(str(text)).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+    if not any('\u0600' <= c <= '\u06FF' for c in text):
+        add_r(p, text, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
+        return
+    pattern = r'(\([A-Za-z0-9_\-\s,\./%α-ωΑ-Ω→⇌⇄<>=\+\^±≥≤≈≠×°µ·²³⁺⁻]+\)|(?:<=|>=|≥|≤|≈|≠|[<>=])\s*\d+(?:\.\d+)?|[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻]+(?:\s*(?:→|->|⇌|<->|⇄|<=|>=|≥|≤|≈|≠|<|>|=)\s*[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻]+)+|[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻]{2,}|[→⇌⇄≥≤≈≠×°µ·])'
     tokens = re.split(pattern, text)
     for tok in tokens:
         if not tok:
             continue
         has_persian = any('\u0600' <= c <= '\u06FF' for c in tok)
-        if not has_persian and (re.search(r'[A-Za-z0-9→⇌⇄<>=]', tok) or tok.startswith('(')):
+        if not has_persian and (re.search(r'[A-Za-z0-9→⇌⇄<>=≥≤≈≠×°µ·]', tok) or tok.startswith('(')):
             add_r(p, " " + tok.strip() + " ", font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
         else:
             add_r(p, tok, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=True)
@@ -282,7 +286,7 @@ def add_formatted_bidi_text(p, text_or_runs, font_name="Dubai", size_pt=10.5, de
         runs = parse_inline_spans(str(text_or_runs), default_bold=default_bold, default_italic=default_italic)
         
     for r in runs:
-        r_text = r.get("text", "")
+        r_text = sanitize_latex_math(r.get("text", ""))
         if not r_text:
             continue
         r_bold = r.get("bold", default_bold)
@@ -551,7 +555,8 @@ def render_reference_table(parent_cell, headers, items, ref_book_name="هاری�
         '''.format(nsdecls('w'))))
         p_t = c.paragraphs[0]
         set_p_rtl(p_t, space_before=2.5, space_after=2.5)
-        add_r(p_t, h, font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x5D, 0x40, 0x37))
+        h_clean = sanitize_latex_math(str(h))
+        add_r(p_t, h_clean, font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x5D, 0x40, 0x37))
         
     for r_idx, item in enumerate(items):
         row_num = r_idx + 1
@@ -581,7 +586,8 @@ def render_reference_table(parent_cell, headers, items, ref_book_name="هاری�
             '''.format(nsdecls('w'))))
             p_m = cell_merged.paragraphs[0]
             set_p_rtl(p_m, space_before=2.5, space_after=2.5)
-            add_r(p_m, item.get("text", ""), font_name="Dubai", size_pt=11, bold=True, color_rgb=(0xFF, 0xFF, 0xFF))
+            banner_txt = sanitize_latex_math(str(item.get("text", "")))
+            add_r(p_m, banner_txt, font_name="Dubai", size_pt=11, bold=True, color_rgb=(0xFF, 0xFF, 0xFF))
         else:
             if isinstance(item, dict):
                 cols_val = item.get("cols") or item.get("cells") or [item.get("text", "")]
@@ -594,7 +600,7 @@ def render_reference_table(parent_cell, headers, items, ref_book_name="هاری�
                 bg = "FFFFFF" if r_idx % 2 == 0 else "FDFBF7"
 
             for c_idx in range(len(headers)):
-                val = str(cols_val[c_idx]) if c_idx < len(cols_val) else ""
+                val = sanitize_latex_math(str(cols_val[c_idx])) if c_idx < len(cols_val) else ""
                 c = t.cell(row_num, c_idx)
                 tcPr_t = c._tc.get_or_add_tcPr()
                 tcPr_t.append(parse_xml(r'<w:shd {} w:fill="{}"/>'.format(nsdecls('w'), bg)))
@@ -619,6 +625,8 @@ def render_reference_table(parent_cell, headers, items, ref_book_name="هاری�
                 is_bold = (c_idx == 0) and not val.startswith("   ")
                 add_bidi_text(p_c, val, font_name="Dubai", size_pt=10, bold=is_bold, color_rgb=(0x26, 0x26, 0x26))
 
+    return t
+
 render_harrison_table = render_reference_table
 
 def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref_book_name="کتاب مرجع", image_already_shown=False):
@@ -626,8 +634,8 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     Supports pure text slides, localized tables, and optional diagrams.
     Auto-detects table_data from slide_data if not explicitly passed."""
     slide_num = slide_data.get('slide_number', '?')
-    title_fa = slide_data.get('title_fa', f'اسلاید {slide_num}')
-    title_en = slide_data.get('title_en', '')
+    title_fa = sanitize_latex_math(slide_data.get('title_fa', f'اسلاید {slide_num}'))
+    title_en = sanitize_latex_math(slide_data.get('title_en', ''))
     bullets = slide_data.get('bullets', [])
     ref_note = sanitize_ref_note(slide_data.get('ref_note', ''))
     is_visual = bool(

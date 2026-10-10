@@ -1,6 +1,6 @@
 [project]
 name = "medical-lecture-transcriber"
-version = "5.7.2"
+version = "5.7.3"
 description = "Publication-grade medical study guide and lecture transcription workflow"
 readme = "SKILL.md"
 requires-python = ">=3.11"

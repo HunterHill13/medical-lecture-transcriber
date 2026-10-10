@@ -41,7 +41,8 @@ from text_utils import (
     has_ref_note_prefix,
     extract_clinical_facts,
     COMBINED_DIGITS,
-    sanitize_presentation_text
+    sanitize_presentation_text,
+    sanitize_latex_math
 )
 
 # Clause markers that indicate full English prose/sentences inside parentheses
@@ -818,6 +819,7 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                 b_txt = " ".join(str(x) for x in b)
             else:
                 b_txt = str(b)
+            b_txt = sanitize_latex_math(b_txt)
 
             parentheticals = re.findall(r'[\(（]([^)）]+)[\)）]', b_txt)
             for p_str in parentheticals:
