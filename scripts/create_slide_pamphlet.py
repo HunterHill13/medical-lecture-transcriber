@@ -555,7 +555,8 @@ def render_reference_table(parent_cell, headers, items, ref_book_name="هاری�
         
     for r_idx, item in enumerate(items):
         row_num = r_idx + 1
-        if item.get("type") == "banner":
+        is_banner = isinstance(item, dict) and item.get("type") == "banner"
+        if is_banner:
             cell_start = t.cell(row_num, 0)
             cell_end = t.cell(row_num, len(headers) - 1)
             cell_merged = cell_start.merge(cell_end)
@@ -580,11 +581,20 @@ def render_reference_table(parent_cell, headers, items, ref_book_name="هاری�
             '''.format(nsdecls('w'))))
             p_m = cell_merged.paragraphs[0]
             set_p_rtl(p_m, space_before=2.5, space_after=2.5)
-            add_r(p_m, item["text"], font_name="Dubai", size_pt=11, bold=True, color_rgb=(0xFF, 0xFF, 0xFF))
+            add_r(p_m, item.get("text", ""), font_name="Dubai", size_pt=11, bold=True, color_rgb=(0xFF, 0xFF, 0xFF))
         else:
-            cols_val = item["cols"]
-            bg = item.get("bg", "FFFFFF" if r_idx % 2 == 0 else "FDFBF7")
-            for c_idx, val in enumerate(cols_val):
+            if isinstance(item, dict):
+                cols_val = item.get("cols") or item.get("cells") or [item.get("text", "")]
+                bg = item.get("bg", "FFFFFF" if r_idx % 2 == 0 else "FDFBF7")
+            elif isinstance(item, (list, tuple)):
+                cols_val = list(item)
+                bg = "FFFFFF" if r_idx % 2 == 0 else "FDFBF7"
+            else:
+                cols_val = [str(item)]
+                bg = "FFFFFF" if r_idx % 2 == 0 else "FDFBF7"
+
+            for c_idx in range(len(headers)):
+                val = str(cols_val[c_idx]) if c_idx < len(cols_val) else ""
                 c = t.cell(row_num, c_idx)
                 tcPr_t = c._tc.get_or_add_tcPr()
                 tcPr_t.append(parse_xml(r'<w:shd {} w:fill="{}"/>'.format(nsdecls('w'), bg)))

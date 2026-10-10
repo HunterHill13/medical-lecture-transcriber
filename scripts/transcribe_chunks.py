@@ -10,6 +10,7 @@ import os
 import sys
 import json
 import base64
+import time
 import argparse
 import urllib.request
 import urllib.error
@@ -49,8 +50,11 @@ def get_mime_type(file_path: str) -> str:
     }
     return mapping.get(ext, "audio/mp4")
 
-def transcribe_chunk_with_gemini_rest(chunk_path: str, api_key: str, model: str = "gemini-2.0-flash") -> str:
-    """Transcribes an audio chunk using standard library urllib without heavyweight dependencies."""
+def transcribe_chunk_with_gemini_rest(chunk_path: str, api_key: str, model: str = "gemini-2.0-flash", max_retries: int = 3, retry_delay: float = 2.0) -> str:
+    """
+    Transcribes an audio chunk using standard library urllib with exponential backoff retry.
+    Retries automatically on HTTP 429 (rate limit / quota), HTTP 503, or network connection timeouts.
+    """
     if not os.path.exists(chunk_path):
         raise FileNotFoundError(f"Audio chunk not found: {chunk_path}")
         
@@ -81,14 +85,36 @@ def transcribe_chunk_with_gemini_rest(chunk_path: str, api_key: str, model: str 
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        res_json = json.loads(resp.read().decode("utf-8"))
-        candidates = res_json.get("candidates", [])
-        if candidates and "content" in candidates[0]:
-            parts = candidates[0]["content"].get("parts", [])
-            text_result = "".join(p.get("text", "") for p in parts)
-            return text_result.strip()
-            
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                res_json = json.loads(resp.read().decode("utf-8"))
+                candidates = res_json.get("candidates", [])
+                if candidates and "content" in candidates[0]:
+                    parts = candidates[0]["content"].get("parts", [])
+                    text_result = "".join(p.get("text", "") for p in parts)
+                    return text_result.strip()
+                return ""
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
+                wait_sec = retry_delay * (2 ** (attempt - 1))
+                sys.stderr.write(f"⚠️ [Retry {attempt}/{max_retries}] HTTP {e.code} received from Gemini API. Backing off {wait_sec:.1f}s...\n")
+                time.sleep(wait_sec)
+                continue
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            last_err = e
+            if attempt < max_retries:
+                wait_sec = retry_delay * (2 ** (attempt - 1))
+                sys.stderr.write(f"⚠️ [Retry {attempt}/{max_retries}] Network error: {e}. Retrying in {wait_sec:.1f}s...\n")
+                time.sleep(wait_sec)
+                continue
+            raise
+
+    if last_err:
+        raise last_err
     return ""
 
 def main():

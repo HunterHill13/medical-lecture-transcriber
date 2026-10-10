@@ -357,3 +357,108 @@ def test_run_pipeline_args_forwarding(monkeypatch, tmp_path):
     last_build_cmd = commands_executed[-1]
     assert "--raw" in last_build_cmd, f"Expected --raw to be forwarded in create_slide_pamphlet command, got: {last_build_cmd}"
     assert raw_f in last_build_cmd
+
+
+def test_render_reference_table_list_rows_and_length_mismatch():
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that render_reference_table in create_slide_pamphlet.py gracefully supports
+    standard 2D list rows: [["val1", "val2"], ...], handles column count mismatches without
+    IndexError, and does not crash with AttributeError when rows are lists instead of dicts.
+    """
+    from create_slide_pamphlet import render_reference_table
+    import docx
+
+    doc = docx.Document()
+    tbl = doc.add_table(rows=1, cols=1)
+    cell = tbl.cell(0, 0)
+
+    headers = ["شاخص بالینی", "مقدار هدف"]
+    # Test combination of:
+    # 1. Standard 2D list row
+    # 2. Row with extra columns (length mismatch)
+    # 3. Row with fewer columns
+    # 4. Dictionary row with 'cols'
+    # 5. Dictionary banner row
+    items = [
+        ["HbA1c", "< 7.0%"],
+        ["فشار خون سیستولیک", "< 130 mmHg", "ستون اضافی که نباید کرش کند"],
+        ["کلسترول LDL"],
+        {"type": "banner", "text": "اهداف دارودرمانی خط اول"},
+        {"cols": ["آتورواستاتین", "۲۰ الی ۴۰ میلی‌گرم"]}
+    ]
+
+    # Prior to fix, this crashed with AttributeError: 'list' object has no attribute 'get'
+    render_reference_table(cell, headers, items)
+    
+    # Assert table was added inside cell
+    assert len(cell.tables) == 1
+    t = cell.tables[0]
+    assert len(t.rows) == len(items) + 1  # 1 header row + 5 item rows
+    assert "HbA1c" in t.rows[1].cells[0].text
+    assert "7.0" in t.rows[1].cells[1].text
+    assert "اهداف دارودرمانی" in t.rows[4].cells[0].text
+    assert "آتورواستاتین" in t.rows[5].cells[0].text
+
+
+def test_transcribe_chunks_retry_backoff(monkeypatch, tmp_path):
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that transcribe_chunk_with_gemini_rest in transcribe_chunks.py
+    implements automatic exponential backoff retry on HTTP 429 rate limit errors
+    and returns successfully when a retry succeeds.
+    """
+    import transcribe_chunks
+    import urllib.error
+    from unittest.mock import MagicMock
+    import io
+    import json
+
+    chunk_file = tmp_path / "test_chunk.m4a"
+    chunk_file.write_bytes(b"dummy audio binary data")
+
+    call_count = 0
+    def fake_urlopen(req, timeout=180):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # First attempt: simulate HTTP 429 Too Many Requests
+            fp = io.BytesIO(b'{"error": {"code": 429, "message": "Resource has been exhausted"}}')
+            raise urllib.error.HTTPError(
+                url="https://generativelanguage.googleapis.com",
+                code=429,
+                msg="Too Many Requests",
+                hdrs={},
+                fp=fp
+            )
+        else:
+            # Second attempt: succeed with transcript JSON
+            mock_resp = MagicMock()
+            resp_data = {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {"text": "تدریس بالینی بیماری کوشینگ و هیپرکورتیزولیسم"}
+                            ]
+                        }
+                    }
+                ]
+            }
+            mock_resp.read.return_value = json.dumps(resp_data).encode("utf-8")
+            mock_resp.__enter__.return_value = mock_resp
+            return mock_resp
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    # Monkeypatch time.sleep to avoid waiting in tests
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+    res = transcribe_chunks.transcribe_chunk_with_gemini_rest(
+        str(chunk_file),
+        api_key="fake-test-key",
+        max_retries=3,
+        retry_delay=0.01
+    )
+
+    assert call_count == 2, f"Expected exactly 2 attempts, but urlopen was called {call_count} times"
+    assert "تدریس بالینی بیماری کوشینگ" in res
