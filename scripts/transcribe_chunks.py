@@ -154,7 +154,8 @@ def main():
     chunks = []
     if os.path.exists(manifest_path):
         with open(manifest_path, "r", encoding="utf-8") as f:
-            chunks = json.load(f)
+            m_data = json.load(f)
+            chunks = m_data.get("chunks", []) if isinstance(m_data, dict) else m_data
     elif os.path.isdir(args.chunks_dir):
         files = sorted(os.listdir(args.chunks_dir))
         for f in files:

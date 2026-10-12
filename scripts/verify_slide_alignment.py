@@ -224,18 +224,19 @@ def validate_slide_schema(slide_dict, idx, available_slide_nums=None):
             elif not isinstance(b, str):
                 errs.append(f"Slide {s_num or idx}, bullet {b_idx}: bullet must be a string, list/tuple of strings, or dict with 'lead' and 'text'")
 
-    if "table_data" in slide_dict and slide_dict["table_data"] is not None:
-        td = slide_dict["table_data"]
+    td = slide_dict.get("table_data")
+    if td is not None:
         if isinstance(td, dict):
             if "headers" not in td or not isinstance(td["headers"], list):
                 errs.append(f"Slide {s_num or idx}: 'table_data.headers' must be a list of strings")
-            if "rows" not in td or not isinstance(td["rows"], list):
-                errs.append(f"Slide {s_num or idx}: 'table_data.rows' must be a list")
+            rows_or_items = td.get("rows") if "rows" in td else td.get("items")
+            if rows_or_items is None or not isinstance(rows_or_items, list):
+                errs.append(f"Slide {s_num or idx}: 'table_data.rows' (or 'items') must be a list")
         elif isinstance(td, (list, tuple)):
             if len(td) != 2 or not isinstance(td[0], list) or not isinstance(td[1], list):
                 errs.append(f"Slide {s_num or idx}: 'table_data' list format must be [headers_list, rows_list]")
         else:
-            errs.append(f"Slide {s_num or idx}: 'table_data' must be a dict with 'headers' and 'rows' or a 2-element list [headers, rows]")
+            errs.append(f"Slide {s_num or idx}: 'table_data' must be a dict with 'headers' and 'rows'/'items' or a 2-element list [headers, rows]")
         
     ref_note = slide_dict.get("ref_note")
     if ref_note is not None and not isinstance(ref_note, str):
@@ -290,18 +291,6 @@ def validate_slide_schema(slide_dict, idx, available_slide_nums=None):
     qa_list = slide_dict.get("qa_list")
     if qa_list is not None and not isinstance(qa_list, list):
         errs.append(f"Slide {s_num or idx}: 'qa_list' must be a list (got {type(qa_list).__name__})")
-            
-    table_data = slide_dict.get("table_data")
-    if table_data is not None:
-        if isinstance(table_data, (list, tuple)) and len(table_data) == 2:
-            headers, rows = table_data
-            if not isinstance(headers, list) or not isinstance(rows, list):
-                errs.append(f"Slide {s_num or idx}: 'table_data' list format must be [headers_list, rows_list]")
-        elif isinstance(table_data, dict):
-            if "headers" not in table_data or ("rows" not in table_data and "items" not in table_data):
-                errs.append(f"Slide {s_num or idx}: 'table_data' dict format must have 'headers' and 'rows'/'items'")
-        else:
-            errs.append(f"Slide {s_num or idx}: 'table_data' must be a 2-element list [headers, rows] or a dict")
             
     return errs
 

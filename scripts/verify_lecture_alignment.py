@@ -830,11 +830,21 @@ def main():
             try:
                 with open(mc, "r", encoding="utf-8") as mf:
                     m_data = json.load(mf)
-                    for item in m_data.get("chunks", []):
-                        fn = os.path.basename(item.get("chunk_filename", ""))
+                    chunks_iter = m_data.get("chunks", []) if isinstance(m_data, dict) else (m_data if isinstance(m_data, list) else [])
+                    for idx_c, item in enumerate(chunks_iter, 1):
+                        if not isinstance(item, dict):
+                            continue
+                        fn = os.path.basename(item.get("chunk_filename") or item.get("filename") or item.get("path") or item.get("file") or "")
                         stem = os.path.splitext(fn)[0]
                         if stem:
                             manifest_chunks[stem] = item
+                        c_idx = item.get("index", idx_c)
+                        try:
+                            c_idx_int = int(c_idx)
+                            manifest_chunks[f"part{c_idx_int:02d}"] = item
+                            manifest_chunks[f"part{c_idx_int}"] = item
+                        except (ValueError, TypeError):
+                            pass
                 break
             except Exception:
                 pass

@@ -363,3 +363,213 @@ def test_run_pipeline_cli_partition_merge_and_qa_check(tmp_path):
         encoding="utf-8",
     )
     assert p3.returncode == 0
+
+
+def test_bug1_vision_detection_and_img_path_resolution(tmp_path):
+    """
+    Bug 1 regression test:
+    - PDF extraction populates 'img_path' on EVERY slide (including pure text slides).
+      '_slide_needs_vision' must NOT mark pure text slides as mandatory vision slides just because 'img_path' exists.
+    - 'run_qa_preflight_and_validate' must resolve 'fig_path' / 'img_path' from raw_slides.json.
+    """
+    raw_path = tmp_path / "raw_slides.json"
+    trans_path = tmp_path / "translated_slides.json"
+    batches_dir = tmp_path / "batches"
+
+    raw_slides = [
+        {
+            "slide_number": 1,
+            "text_lines": ["Pure text slide from PDF"],
+            "img_path": "./slide_images/slide_01.png",
+            "has_images": False,
+            "has_tables": False,
+            "has_charts": False,
+            "is_image_only": False,
+            "needs_vision_inspection": False,
+        },
+        {
+            "slide_number": 2,
+            "text_lines": ["Visual diagram slide"],
+            "img_path": "./slide_images/slide_02.png",
+            "fig_path": "./slide_images/slide_02_fig.png",
+            "has_images": True,
+            "has_standalone_figure": True,
+            "has_tables": True,
+        },
+    ]
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+    manifest = partition_slides(raw_slides_path=str(raw_path), batches_dir=str(batches_dir), batch_size=2)
+    # Slide 1 is pure text (even though img_path is set); only Slide 2 should require vision
+    assert manifest["batches"][0]["mandatory_vision_slides"] == [2]
+
+    trans_slides = [
+        {"slide_number": 1, "title_fa": "متن", "bullets": ["بالت ۱"]},
+        {
+            "slide_number": 2,
+            "title_fa": "شکل",
+            "bullets": [],
+            "table_data": {"headers": ["H1"], "rows": [["R1"]]},
+        },
+    ]
+    trans_path.write_text(json.dumps(trans_slides, ensure_ascii=False), encoding="utf-8")
+    run_qa_preflight_and_validate(
+        raw_slides_path=str(raw_path),
+        translated_path=str(trans_path),
+        batches_dir=str(batches_dir),
+    )
+    dossier = json.loads((batches_dir / "qa_target_dossier.json").read_text(encoding="utf-8"))
+    assert dossier["table_audit_targets"][0]["image_path"] == "./slide_images/slide_02_fig.png"
+    assert len(dossier["visual_audit_targets"]) == 1
+    assert dossier["visual_audit_targets"][0]["image_path"] == "./slide_images/slide_02_fig.png"
+
+
+def test_bug2_table_alias_normalization_and_schema_validation(tmp_path):
+    """
+    Bug 2 regression test:
+    - Worker subagents using 'structured_tables' or 'table_data' with 'items' instead of 'rows'
+      must be normalized cleanly during merge and pass validate_slide_schema in verify_slide_alignment.py.
+    """
+    from verify_slide_alignment import validate_slide_schema
+    from batch_orchestrator import _sanitize_slide_object
+
+    # 1. validate_slide_schema should accept {'headers': [...], 'items': [...]} without duplicate check failure
+    slide_with_items = {
+        "slide_number": 1,
+        "title_fa": "جدول",
+        "bullets": [],
+        "table_data": {"headers": ["دارو", "دوز"], "items": [["آسپرین", "80mg"]]},
+    }
+    errs = validate_slide_schema(slide_with_items, 1, {1})
+    assert errs == []
+
+    # 2. _sanitize_slide_object should canonicalize structured_tables -> table_data and items -> rows
+    raw_worker_slide = {
+        "slide_number": 2,
+        "title_fa": "جدول ۲",
+        "bullets": [],
+        "structured_tables": [{"headers": ["A", "B"], "items": [["x $\\ge 1$", "y"]]}],
+    }
+    cleaned = _sanitize_slide_object(raw_worker_slide)
+    assert "table_data" in cleaned
+    assert cleaned["table_data"]["headers"] == ["A", "B"]
+    assert cleaned["table_data"]["rows"] == [["x ≥ 1", "y"]]
+
+
+def test_bug3_single_slide_final_batch_boundary_deduplication_and_cluster_parent(tmp_path):
+    """
+    Bug 3 regression test:
+    - When the final batch has only 1 slide (e.g. 3 slides with batch_size=2 -> [1,2] and [3]),
+      boundary spoken_lecture deduplication between slide 2 and slide 3 must still execute.
+    - 'cluster_parent' alias must be normalized to 'parent_lecture_slide'.
+    """
+    raw_path = tmp_path / "raw_slides.json"
+    batches_dir = tmp_path / "batches"
+    out_path = tmp_path / "translated_slides.json"
+
+    raw_slides = _make_sample_raw_slides(3)
+    raw_path.write_text(json.dumps(raw_slides, ensure_ascii=False), encoding="utf-8")
+    partition_slides(raw_slides_path=str(raw_path), batches_dir=str(batches_dir), batch_size=2)
+
+    dup_lecture = "این یک متن بسیار طولانی از توضیحات استاد در کلاس است که بیش از هشتاد کاراکتر طول دارد و در مرز دو دسته تکرار شده است."
+    (batches_dir / "translated_batch_01_02.json").write_text(
+        json.dumps([
+            {"slide_number": 1, "title_fa": "۱", "bullets": [], "spoken_lecture": "متن ۱"},
+            {"slide_number": 2, "title_fa": "۲", "bullets": [], "spoken_lecture": dup_lecture, "cluster_parent": 1},
+        ], ensure_ascii=False),
+        encoding="utf-8",
+    )
+    # Batch 2 has only 1 slide (slide 3)
+    (batches_dir / "translated_batch_03_03.json").write_text(
+        json.dumps([
+            {"slide_number": 3, "title_fa": "۳", "bullets": [], "spoken_lecture": dup_lecture},
+        ], ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    report = merge_slide_batches(
+        batches_dir=str(batches_dir),
+        raw_slides_path=str(raw_path),
+        output_path=str(out_path),
+    )
+    assert report["status"] == "PASSED"
+    merged = json.loads(out_path.read_text(encoding="utf-8"))
+    # Slide 2's cluster_parent=1 normalized to parent_lecture_slide=1
+    assert merged[1]["parent_lecture_slide"] == 1
+    # Slide 3 (single-slide batch) deduplicated against Slide 2 and linked to root parent 1
+    assert merged[2]["parent_lecture_slide"] == 1
+
+
+def test_bug4_chunks_manifest_list_format_and_part_mapping(tmp_path):
+    """
+    Bug 4 regression test:
+    - chunk_audio.py writes chunks_manifest.json as a JSON list with 'index', 'filename' ('chunk_01.m4a'), 'path'.
+    - partition_slides must populate non-empty 'chunk_files' from 'path'/'filename'.
+    """
+    raw_path = tmp_path / "raw_slides.json"
+    batches_dir = tmp_path / "batches"
+    chunks_manifest = tmp_path / "chunks_manifest.json"
+
+    raw_path.write_text(json.dumps(_make_sample_raw_slides(2)), encoding="utf-8")
+    # Real chunk_audio.py output format (a JSON list with 'path' and 'filename', NOT 'file')
+    chunks_manifest.write_text(
+        json.dumps([
+            {
+                "index": 1,
+                "filename": "chunk_01.m4a",
+                "path": "audio_chunks\\chunk_01.m4a",
+                "start_sec": 0,
+                "duration_sec": 1200,
+                "end_sec": 1200,
+                "timestamp_start": "00:00:00",
+            }
+        ]),
+        encoding="utf-8",
+    )
+
+    manifest = partition_slides(
+        raw_slides_path=str(raw_path),
+        batches_dir=str(batches_dir),
+        chunks_manifest_path=str(chunks_manifest),
+    )
+    assert manifest["audio_transcription_groups"][0]["chunk_files"] == ["audio_chunks/chunk_01.m4a"]
+
+
+def test_bug5_build_pamphlet_accepts_dict_wrapped_raw_slides_and_table_aliases(tmp_path):
+    """
+    Bug 5 regression test:
+    - build_pamphlet_from_json must accept {'slides': [...]} dict wrapper for raw_slides.json
+      and render 'structured_tables' alias cleanly when 'table_data' is omitted.
+    """
+    from create_slide_pamphlet import build_pamphlet_from_json
+
+    raw_path = tmp_path / "raw_slides.json"
+    trans_path = tmp_path / "translated_slides.json"
+    out_docx = tmp_path / "out.docx"
+
+    raw_path.write_text(
+        json.dumps({"slides": [{"slide_number": 1, "text_lines": ["Slide 1"], "has_tables": True}]}),
+        encoding="utf-8",
+    )
+    trans_path.write_text(
+        json.dumps(
+            [
+                {
+                    "slide_number": 1,
+                    "title_fa": "اسلاید اول",
+                    "bullets": [["عنوان", "توضیحات اسلاید اول"]],
+                    "structured_tables": [{"headers": ["ستون ۱"], "items": [["مقدار ۱"]]}],
+                }
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    build_pamphlet_from_json(
+        str(trans_path),
+        str(out_docx),
+        title="تست",
+        raw_slides_path=str(raw_path),
+    )
+    assert out_docx.exists()
+

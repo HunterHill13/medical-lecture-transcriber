@@ -654,9 +654,15 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     is_ceremonial = bool(slide_data.get("is_ceremonial") or is_ceremonial_slide(slide_data))
     is_skipped = bool(slide_data.get("is_skipped") or slide_data.get("unvoiced") or slide_data.get("skipped_by_professor"))
     
-    # Auto-fallback to slide_data table_data if omitted from arguments
+    # Auto-fallback to slide_data table_data (or structured_tables / reference_tables aliases) if omitted from arguments
     if table_data is None:
-        table_data = slide_data.get("table_data")
+        table_data = (
+            slide_data.get("table_data")
+            or slide_data.get("structured_tables")
+            or slide_data.get("reference_tables")
+        )
+    if isinstance(table_data, list) and len(table_data) == 1 and isinstance(table_data[0], dict):
+        table_data = table_data[0]
     
     tbl = doc.add_table(rows=2, cols=1)
     tblPr = tbl._tbl.tblPr
@@ -968,7 +974,8 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
     if raw_slides_path and os.path.isfile(raw_slides_path):
         try:
             with open(raw_slides_path, "r", encoding="utf-8") as f_raw:
-                raw_list = json.load(f_raw)
+                raw_data = json.load(f_raw)
+                raw_list = raw_data.get("slides", []) if isinstance(raw_data, dict) else raw_data
                 if isinstance(raw_list, list):
                     raw_db = {s.get("slide_number"): s for s in raw_list if isinstance(s, dict) and "slide_number" in s}
         except Exception:
@@ -1077,7 +1084,14 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
 
         bullets = slide.get("bullets", [])
         num_bullets = len(bullets)
-        has_table_content = bool(slide.get("table_data") or slide_augmented.get("has_tables") or slide_augmented.get("has_image_table"))
+        table_data = (
+            slide_augmented.get("table_data")
+            or slide_augmented.get("structured_tables")
+            or slide_augmented.get("reference_tables")
+        )
+        if isinstance(table_data, list) and len(table_data) == 1 and isinstance(table_data[0], dict):
+            table_data = table_data[0]
+        has_table_content = bool(table_data or slide_augmented.get("has_tables") or slide_augmented.get("has_image_table"))
         has_chart_content = bool(slide.get("has_charts") or slide_augmented.get("has_charts"))
         is_pure_vis = bool(slide.get("is_pure_visual") or slide.get("is_image_only") or slide_augmented.get("is_pure_visual"))
 
@@ -1109,7 +1123,6 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
         else:
             slide_augmented["is_visual"] = False
 
-        table_data = slide_augmented.get("table_data", None)
         add_slide_box_from_json(doc, slide_augmented, img_path=img_path, table_data=table_data, ref_book_name=ref_book)
         
     doc.save(output_docx_path)

@@ -62,15 +62,29 @@ def _load_json_slides(path: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
 
 
 def _slide_needs_vision(raw_slide: Dict[str, Any]) -> bool:
-    if raw_slide.get("needs_vision_inspection") or raw_slide.get("is_image_only"):
+    if raw_slide.get("needs_vision_inspection") or raw_slide.get("is_image_only") or raw_slide.get("is_pure_visual"):
         return True
     if raw_slide.get("has_tables") or raw_slide.get("has_image_table") or raw_slide.get("tables"):
         return True
-    if raw_slide.get("has_images") or raw_slide.get("has_charts") or raw_slide.get("has_smartart"):
+    if (
+        raw_slide.get("has_images")
+        or raw_slide.get("has_charts")
+        or raw_slide.get("has_smartart")
+        or raw_slide.get("has_standalone_figure")
+    ):
         return True
-    if raw_slide.get("extracted_images") or raw_slide.get("image_path"):
+    if raw_slide.get("extracted_images") or raw_slide.get("fig_path") or raw_slide.get("image_path"):
         return True
     return False
+
+
+def _resolve_slide_image_path(raw_slide: Dict[str, Any], s_num: int) -> str:
+    return _to_posix(
+        raw_slide.get("fig_path")
+        or raw_slide.get("img_path")
+        or raw_slide.get("image_path")
+        or f"slide_images/slide_{s_num:02d}.png"
+    )
 
 
 def _slide_has_table(raw_slide: Dict[str, Any]) -> bool:
@@ -82,10 +96,35 @@ def _slide_has_table(raw_slide: Dict[str, Any]) -> bool:
     )
 
 
+def _sanitize_table_rows(rows: List[Any]) -> List[Any]:
+    new_rows = []
+    for r in rows:
+        if isinstance(r, dict):
+            nr = dict(r)
+            if isinstance(nr.get("text"), str):
+                nr["text"] = sanitize_latex_math(nr["text"])
+            if isinstance(nr.get("cols"), list):
+                nr["cols"] = [sanitize_latex_math(str(c)) for c in nr["cols"]]
+            new_rows.append(nr)
+        elif isinstance(r, list):
+            new_rows.append([sanitize_latex_math(str(c)) for c in r])
+        elif isinstance(r, str):
+            new_rows.append(sanitize_latex_math(r))
+        else:
+            new_rows.append(r)
+    return new_rows
+
+
 def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرنس") -> Dict[str, Any]:
-    """Applies deterministic LaTeX math and ref_note sanitization across all fields of a slide dict."""
+    """Applies deterministic LaTeX math, table canonicalization, and ref_note sanitization across all fields of a slide dict."""
     s = dict(slide)
     s.pop("_halo_role", None)
+
+    # Normalize cluster_parent alias -> parent_lecture_slide
+    if "cluster_parent" in s:
+        cp_val = s.pop("cluster_parent")
+        if s.get("parent_lecture_slide") is None and cp_val is not None:
+            s["parent_lecture_slide"] = cp_val
 
     for str_key in ("title_fa", "title_en", "section_title", "spoken_lecture", "audio_time_range"):
         if isinstance(s.get(str_key), str):
@@ -112,28 +151,18 @@ def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرن
                 clean_bullets.append(b)
         s["bullets"] = clean_bullets
 
-    # Sanitize table_data / structured_tables / reference_tables
+    # Sanitize and canonicalize table_data / structured_tables / reference_tables
     for tbl_key in ("table_data", "structured_tables", "reference_tables"):
         tbl_val = s.get(tbl_key)
         if isinstance(tbl_val, dict):
             ct = dict(tbl_val)
             if isinstance(ct.get("headers"), list):
                 ct["headers"] = [sanitize_latex_math(str(h)) for h in ct["headers"]]
-            if isinstance(ct.get("rows"), list):
-                new_rows = []
-                for r in ct["rows"]:
-                    if isinstance(r, dict):
-                        nr = dict(r)
-                        if isinstance(nr.get("text"), str):
-                            nr["text"] = sanitize_latex_math(nr["text"])
-                        if isinstance(nr.get("cols"), list):
-                            nr["cols"] = [sanitize_latex_math(str(c)) for c in nr["cols"]]
-                        new_rows.append(nr)
-                    elif isinstance(r, list):
-                        new_rows.append([sanitize_latex_math(str(c)) for c in r])
-                    else:
-                        new_rows.append(r)
-                ct["rows"] = new_rows
+            raw_rows = ct.get("rows") if isinstance(ct.get("rows"), list) else ct.get("items")
+            if isinstance(raw_rows, list):
+                ct["rows"] = _sanitize_table_rows(raw_rows)
+                if "items" in ct:
+                    ct.pop("items", None)
             s[tbl_key] = ct
         elif isinstance(tbl_val, list):
             # Could be [headers, rows] or list of table dicts
@@ -141,19 +170,7 @@ def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرن
                 not tbl_val[0] or isinstance(tbl_val[0][0], str)
             ):
                 headers = [sanitize_latex_math(str(h)) for h in tbl_val[0]]
-                rows = []
-                for r in tbl_val[1]:
-                    if isinstance(r, dict):
-                        nr = dict(r)
-                        if isinstance(nr.get("text"), str):
-                            nr["text"] = sanitize_latex_math(nr["text"])
-                        if isinstance(nr.get("cols"), list):
-                            nr["cols"] = [sanitize_latex_math(str(c)) for c in nr["cols"]]
-                        rows.append(nr)
-                    elif isinstance(r, list):
-                        rows.append([sanitize_latex_math(str(c)) for c in r])
-                    else:
-                        rows.append(r)
+                rows = _sanitize_table_rows(tbl_val[1])
                 s[tbl_key] = [headers, rows]
             else:
                 new_list = []
@@ -162,25 +179,26 @@ def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرن
                         ct = dict(item)
                         if isinstance(ct.get("headers"), list):
                             ct["headers"] = [sanitize_latex_math(str(h)) for h in ct["headers"]]
-                        if isinstance(ct.get("rows"), list):
-                            new_rows = []
-                            for r in ct["rows"]:
-                                if isinstance(r, dict):
-                                    nr = dict(r)
-                                    if isinstance(nr.get("text"), str):
-                                        nr["text"] = sanitize_latex_math(nr["text"])
-                                    if isinstance(nr.get("cols"), list):
-                                        nr["cols"] = [sanitize_latex_math(str(c)) for c in nr["cols"]]
-                                    new_rows.append(nr)
-                                elif isinstance(r, list):
-                                    new_rows.append([sanitize_latex_math(str(c)) for c in r])
-                                else:
-                                    new_rows.append(r)
-                            ct["rows"] = new_rows
+                        raw_rows = ct.get("rows") if isinstance(ct.get("rows"), list) else ct.get("items")
+                        if isinstance(raw_rows, list):
+                            ct["rows"] = _sanitize_table_rows(raw_rows)
+                            if "items" in ct:
+                                ct.pop("items", None)
                         new_list.append(ct)
                     else:
                         new_list.append(item)
-                s[tbl_key] = new_list
+                s[tbl_key] = new_list[0] if len(new_list) == 1 and isinstance(new_list[0], dict) else new_list
+
+    # Canonicalize structured_tables / reference_tables into table_data if table_data is absent
+    if not s.get("table_data"):
+        for alias_key in ("structured_tables", "reference_tables"):
+            alias_val = s.get(alias_key)
+            if alias_val:
+                if isinstance(alias_val, list) and len(alias_val) >= 1 and isinstance(alias_val[0], dict):
+                    s["table_data"] = alias_val[0]
+                else:
+                    s["table_data"] = alias_val
+                break
 
     return s
 
@@ -193,14 +211,14 @@ def _slide_has_valid_translated_table(slide: Dict[str, Any]) -> bool:
             continue
         if isinstance(val, dict):
             headers = val.get("headers", [])
-            rows = val.get("rows", [])
+            rows = val.get("rows") or val.get("items", [])
             if headers and rows:
                 return True
         elif isinstance(val, list):
             if len(val) == 2 and isinstance(val[0], list) and isinstance(val[1], list) and val[0] and val[1]:
                 return True
             for item in val:
-                if isinstance(item, dict) and item.get("headers") and item.get("rows"):
+                if isinstance(item, dict) and item.get("headers") and (item.get("rows") or item.get("items")):
                     return True
     return False
 
@@ -333,7 +351,10 @@ def partition_slides(
                     audio_groups.append({
                         "audio_worker_index": (a_idx // audio_batch_size) + 1,
                         "chunk_indices": [c.get("index", i + 1) for i, c in enumerate(sub_chunks, start=a_idx)],
-                        "chunk_files": [_to_posix(c.get("file", "")) for c in sub_chunks],
+                        "chunk_files": [
+                            _to_posix(c.get("file") or c.get("path") or c.get("filename") or "")
+                            for c in sub_chunks
+                        ],
                         "target_transcript_files": [
                             f"transcripts/part{int(c.get('index', i + 1)):02d}.txt"
                             for i, c in enumerate(sub_chunks, start=a_idx)
@@ -404,7 +425,7 @@ def merge_slide_batches(
         expected_nums = [int(n) for n in b_entry["expected_slide_numbers"]]
         expected_set = set(expected_nums)
 
-        if len(expected_nums) >= 2:
+        if len(expected_nums) >= 1:
             batch_boundaries.append((expected_nums[0], expected_nums[-1]))
 
         if not os.path.exists(shard_file):
@@ -625,7 +646,7 @@ def run_qa_preflight_and_validate(
                 "slide_number": s_num,
                 "raw_has_table": has_raw_tbl,
                 "translated_has_table_data": has_trans_tbl,
-                "image_path": _to_posix(r_s.get("image_path", f"slide_images/slide_{s_num:02d}.png")),
+                "image_path": _resolve_slide_image_path(r_s, s_num),
             })
             if has_raw_tbl and not has_trans_tbl:
                 structural_issues.append({
@@ -637,7 +658,7 @@ def run_qa_preflight_and_validate(
         if _slide_needs_vision(r_s):
             visual_audit_targets.append({
                 "slide_number": s_num,
-                "image_path": _to_posix(r_s.get("image_path", f"slide_images/slide_{s_num:02d}.png")),
+                "image_path": _resolve_slide_image_path(r_s, s_num),
                 "is_image_only": bool(r_s.get("is_image_only")),
                 "has_tables": has_raw_tbl,
             })
