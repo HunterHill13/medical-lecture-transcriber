@@ -137,6 +137,43 @@ def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
 
     return src_path
 
+def create_composite_image(image_paths: list, output_path: str) -> str | None:
+    """
+    Vertically stitches multiple image slices (e.g. multi-part tables or split diagrams)
+    into a single unified composite PNG in reading order.
+    """
+    if not image_paths or not output_path:
+        return None
+    valid_paths = [p for p in image_paths if p and os.path.exists(p)]
+    if not valid_paths:
+        return None
+    if len(valid_paths) == 1:
+        return valid_paths[0]
+        
+    try:
+        from PIL import Image
+        images = []
+        for p in valid_paths:
+            png_p = convert_image_to_png(p)
+            im = Image.open(png_p if (png_p and os.path.exists(png_p)) else p)
+            images.append(im.convert("RGB"))
+            
+        max_w = max(im.width for im in images)
+        total_h = sum(im.height for im in images)
+        composite = Image.new("RGB", (max_w, total_h), color=(255, 255, 255))
+        y_offset = 0
+        for im in images:
+            x_offset = (max_w - im.width) // 2
+            composite.paste(im, (x_offset, y_offset))
+            y_offset += im.height
+            im.close()
+            
+        composite.save(output_path, "PNG")
+        return output_path
+    except Exception as e:
+        sys.stderr.write(f"WARNING: Failed to stitch composite image to {output_path}: {e}\n")
+        return None
+
 def render_pptx_slides_to_images(pptx_path: str, img_dir: str) -> bool:
     """
     Attempts full-slide rendering of PPTX presentations to high-resolution PNGs (slide_01.png, ...)
@@ -264,6 +301,7 @@ def extract_pptx(pptx_path, img_dir=None):
         has_smartart = False
         has_standalone_figure = False
         standalone_fig_path = None
+        fig_paths = []
         image_extraction_error = False
         
         # Check shapes (recursively unrolling group shapes)
@@ -305,25 +343,40 @@ def extract_pptx(pptx_path, img_dir=None):
                 
                 if not is_tiny and not is_full_bg:
                     has_images = True
-                    if img_dir and hasattr(shape, "image") and not standalone_fig_path:
+                    if img_dir and hasattr(shape, "image"):
                         try:
                             img_bytes = shape.image.blob
                             ext = shape.image.ext or "png"
-                            fig_filename = f"slide_{slide_num:02d}_fig.{ext}"
+                            fig_idx = len(fig_paths) + 1
+                            if fig_idx == 1:
+                                fig_filename = f"slide_{slide_num:02d}_fig.{ext}"
+                                png_name = f"slide_{slide_num:02d}_fig.png"
+                            else:
+                                fig_filename = f"slide_{slide_num:02d}_fig_{fig_idx:02d}.{ext}"
+                                png_name = f"slide_{slide_num:02d}_fig_{fig_idx:02d}.png"
                             fig_path_raw = os.path.join(img_dir, fig_filename)
                             if not os.path.exists(fig_path_raw):
                                 with open(fig_path_raw, "wb") as f_img:
                                     f_img.write(img_bytes)
                             if ext.lower() != "png":
-                                png_target = os.path.join(img_dir, f"slide_{slide_num:02d}_fig.png")
-                                standalone_fig_path = convert_image_to_png(fig_path_raw, png_target)
+                                png_target = os.path.join(img_dir, png_name)
+                                conv_path = convert_image_to_png(fig_path_raw, png_target)
+                                saved_path = conv_path if (conv_path and os.path.exists(conv_path)) else fig_path_raw
                             else:
-                                standalone_fig_path = fig_path_raw
+                                saved_path = fig_path_raw
+                            fig_paths.append(saved_path)
+                            if not standalone_fig_path:
+                                standalone_fig_path = saved_path
                             has_standalone_figure = True
                         except Exception as e:
                             sys.stderr.write(f"WARNING: Failed to extract shape image on slide {slide_num}: {e}\n")
                             image_extraction_error = True
-                        
+
+        composite_fig_path = None
+        if len(fig_paths) > 1 and img_dir:
+            comp_target = os.path.join(img_dir, f"slide_{slide_num:02d}_composite.png")
+            composite_fig_path = create_composite_image(fig_paths, comp_target)
+
         if not title and text_lines:
             title = text_lines[0]
             
@@ -340,10 +393,15 @@ def extract_pptx(pptx_path, img_dir=None):
         ocr_confident = False
         ocr_uncertain = False
         candidate_img = None
+        ocr_targets = []
         if img_dir:
             full_img = os.path.join(img_dir, f"slide_{slide_num:02d}.png")
             if os.path.exists(full_img):
                 candidate_img = full_img
+                ocr_targets = [full_img]
+            elif fig_paths:
+                ocr_targets = [p for p in fig_paths if p and os.path.exists(p)]
+                candidate_img = composite_fig_path or (fig_paths[0] if fig_paths else None)
             elif is_text_empty or has_images or has_charts:
                 for ext_cand in ("png", "jpg", "jpeg", "wmf", "emf", "webp", "tiff", "tif", "bmp", "svg"):
                     single_img = os.path.join(img_dir, f"slide_{slide_num:02d}_img.{ext_cand}")
@@ -369,10 +427,25 @@ def extract_pptx(pptx_path, img_dir=None):
                                     break
                             candidate_img = cand_path
                             break
+                if candidate_img:
+                    ocr_targets = [candidate_img]
 
         # Run OCR if visual content exists OR if text is sparse (< 5 words)
-        if candidate_img and (has_visuals or total_words < 5 or is_text_empty):
-            ocr_lines, ocr_conf, ocr_confident, ocr_uncertain = run_ocr_on_image(candidate_img)
+        if ocr_targets and (has_visuals or total_words < 5 or is_text_empty):
+            all_confs = []
+            for target_path in ocr_targets:
+                sub_lines, sub_conf, sub_conf_flag, sub_unc_flag = run_ocr_on_image(target_path)
+                for l in sub_lines:
+                    if l not in ocr_lines:
+                        ocr_lines.append(l)
+                if sub_conf > 0:
+                    all_confs.append(sub_conf)
+                if sub_conf_flag:
+                    ocr_confident = True
+                if sub_unc_flag:
+                    ocr_uncertain = True
+            if all_confs:
+                ocr_conf = sum(all_confs) / len(all_confs)
 
         has_image_table = detect_image_table(title, text_lines, ocr_lines, has_images)
         if has_image_table:
@@ -390,7 +463,9 @@ def extract_pptx(pptx_path, img_dir=None):
             "ocr_text_lines": ocr_lines,
             "has_images": has_images,
             "has_standalone_figure": has_standalone_figure,
-            "fig_path": standalone_fig_path,
+            "fig_path": composite_fig_path or standalone_fig_path,
+            "fig_paths": fig_paths,
+            "composite_fig_path": composite_fig_path,
             "full_slide_rendered": full_rendered,
             "has_tables": has_tables,
             "has_image_table": has_image_table,
@@ -471,19 +546,31 @@ def extract_pdf(pdf_path, img_dir=None):
         # Standalone embedded figure extraction
         standalone_fig_path = None
         has_standalone_figure = False
+        fig_paths = []
         if img_dir and substantive_images:
-            try:
-                xref_to_extract, base_info = substantive_images[0]
-                pix_fig = pymupdf.Pixmap(doc, xref_to_extract)
-                if pix_fig.n >= 5:
-                    pix_fig = pymupdf.Pixmap(pymupdf.csRGB, pix_fig)
-                fig_filename = f"slide_{slide_num:02d}_fig.png"
-                fig_full_path = os.path.join(img_dir, fig_filename)
-                pix_fig.save(fig_full_path)
-                standalone_fig_path = fig_full_path
-                has_standalone_figure = True
-            except Exception as e:
-                sys.stderr.write(f"WARNING: Failed to extract standalone figure for slide {slide_num}: {e}\n")
+            for s_idx, (xref_to_extract, base_info) in enumerate(substantive_images):
+                try:
+                    pix_fig = pymupdf.Pixmap(doc, xref_to_extract)
+                    if pix_fig.n >= 5:
+                        pix_fig = pymupdf.Pixmap(pymupdf.csRGB, pix_fig)
+                    fig_idx = s_idx + 1
+                    if fig_idx == 1:
+                        fig_filename = f"slide_{slide_num:02d}_fig.png"
+                    else:
+                        fig_filename = f"slide_{slide_num:02d}_fig_{fig_idx:02d}.png"
+                    fig_full_path = os.path.join(img_dir, fig_filename)
+                    pix_fig.save(fig_full_path)
+                    fig_paths.append(fig_full_path)
+                    if not standalone_fig_path:
+                        standalone_fig_path = fig_full_path
+                    has_standalone_figure = True
+                except Exception as e:
+                    sys.stderr.write(f"WARNING: Failed to extract standalone figure for slide {slide_num}: {e}\n")
+
+        composite_fig_path = None
+        if len(fig_paths) > 1 and img_dir:
+            comp_target = os.path.join(img_dir, f"slide_{slide_num:02d}_composite.png")
+            composite_fig_path = create_composite_image(fig_paths, comp_target)
 
         has_images = bool(len(substantive_images) > 0 or (len(raw_lines) == 0 and len(image_list) > 0))
         
@@ -575,7 +662,9 @@ def extract_pdf(pdf_path, img_dir=None):
             "ocr_text_lines": ocr_lines,
             "has_images": has_images,
             "has_standalone_figure": has_standalone_figure,
-            "fig_path": standalone_fig_path,
+            "fig_path": composite_fig_path or standalone_fig_path,
+            "fig_paths": fig_paths,
+            "composite_fig_path": composite_fig_path,
             "has_tables": has_tables,
             "has_image_table": has_image_table,
             "has_image_text": has_image_text,

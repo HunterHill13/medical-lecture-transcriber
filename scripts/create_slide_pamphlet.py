@@ -126,6 +126,9 @@ def find_and_prepare_slide_image(img_dir: str, slide_num: int, only_standalone: 
     
     # 1. Standalone figure patterns (HIGHEST PRIORITY)
     standalone_patterns = [
+        f"slide_{slide_num:03d}_composite",
+        f"slide_{slide_num:02d}_composite",
+        f"slide_{slide_num}_composite",
         f"slide_{slide_num:03d}_fig",
         f"slide_{slide_num:02d}_fig",
         f"slide_{slide_num}_fig",

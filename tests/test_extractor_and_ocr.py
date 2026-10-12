@@ -1047,10 +1047,105 @@ def test_extract_pptx_with_group_shapes():
         )
 
 
+def test_extract_pptx_multiple_images_extracts_all_and_ocrs_all(monkeypatch):
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that extract_pptx extracts ALL substantive images on a slide (not just the first one),
+    stores them in fig_paths, and runs OCR on all of them so multi-part tables/diagrams are not truncated.
+    """
+    from PIL import Image
+    import io
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pptx_path = os.path.join(tmp_dir, "test_multi_image.pptx")
+        prs = Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+        # Image 1 (top half: 300x200)
+        img1 = Image.new("RGB", (300, 200), color="blue")
+        buf1 = io.BytesIO()
+        img1.save(buf1, format="PNG")
+        buf1.seek(0)
+        slide.shapes.add_picture(buf1, Inches(1), Inches(1), Inches(4), Inches(2))
+
+        # Image 2 (bottom half: 300x200)
+        img2 = Image.new("RGB", (300, 200), color="green")
+        buf2 = io.BytesIO()
+        img2.save(buf2, format="PNG")
+        buf2.seek(0)
+        slide.shapes.add_picture(buf2, Inches(1), Inches(3.5), Inches(4), Inches(2))
+
+        prs.save(pptx_path)
+
+        # Mock OCR to return distinct lines for each image
+        ocr_calls = []
+        def fake_ocr(img_path):
+            ocr_calls.append(img_path)
+            if "fig" in img_path and ("2" in img_path or "02" in img_path):
+                return ["Lactic acidosis risk", "Contraindication: eGFR < 30"], 0.90, True, False
+            else:
+                return ["Metformin mechanism: AMPK activation", "Advantages: weight neutral"], 0.92, True, False
+
+        monkeypatch.setattr("extract_presentation.run_ocr_on_image", fake_ocr)
+
+        slides = extract_pptx(pptx_path, img_dir=tmp_dir)
+        assert len(slides) == 1
+        meta = slides[0]
+
+        # 1. Both images must be captured in fig_paths
+        assert "fig_paths" in meta, "Expected 'fig_paths' list in slide metadata"
+        assert len(meta["fig_paths"]) == 2, f"Expected 2 extracted figures, got {len(meta.get('fig_paths', []))}: {meta.get('fig_paths')}"
+
+        # 2. Both image files must physically exist on disk
+        for p in meta["fig_paths"]:
+            assert os.path.exists(p), f"Extracted figure file does not exist: {p}"
+
+        # 3. Both images must have been OCR'd
+        assert len(ocr_calls) >= 2, f"Expected OCR to run on both images, but ran {len(ocr_calls)} times: {ocr_calls}"
+
+        # 4. ocr_text_lines must contain content from BOTH images
+        assert any("Metformin" in line for line in meta["ocr_text_lines"]), "Missing top half of table from OCR"
+        assert any("Lactic acidosis" in line or "eGFR" in line for line in meta["ocr_text_lines"]), "Missing bottom half of table from OCR"
 
 
+def test_extract_pdf_multiple_images_extracts_all_and_composites(tmp_path):
+    """
+    Regression Test:
+    Verifies that extract_pdf extracts ALL substantive images on a PDF slide,
+    populates fig_paths with all of them, and stitches a composite image.
+    """
+    from PIL import Image
+    import io
 
+    pdf_path = str(tmp_path / "test_multi_img.pdf")
+    img_dir = str(tmp_path / "pdf_extracted")
+    os.makedirs(img_dir, exist_ok=True)
 
+    img1 = Image.new("RGB", (200, 150), color="blue")
+    buf1 = io.BytesIO()
+    img1.save(buf1, format="PNG")
 
+    img2 = Image.new("RGB", (200, 150), color="yellow")
+    buf2 = io.BytesIO()
+    img2.save(buf2, format="PNG")
 
+    doc = pymupdf.open()
+    page = doc.new_page(width=720, height=540)
+    page.insert_text((50, 50), "Overview of Antidiabetic Therapy")
+    page.insert_image(pymupdf.Rect(50, 100, 250, 250), stream=buf1.getvalue())
+    page.insert_image(pymupdf.Rect(50, 260, 250, 410), stream=buf2.getvalue())
+    doc.save(pdf_path)
+    doc.close()
+
+    slides = extract_pdf(pdf_path, img_dir=img_dir)
+    assert len(slides) == 1
+    meta = slides[0]
+
+    assert meta["has_standalone_figure"] is True
+    assert "fig_paths" in meta
+    assert len(meta["fig_paths"]) == 2
+    for p in meta["fig_paths"]:
+        assert os.path.exists(p)
+    assert meta["composite_fig_path"] is not None
+    assert os.path.exists(meta["composite_fig_path"])
 

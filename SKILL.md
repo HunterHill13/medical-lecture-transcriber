@@ -1,9 +1,10 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.8.0): enforces Three-Tier Multi-Agent Parallel Orchestration
-  & Independent QA Critic Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis via deterministic
-  'run_pipeline.py partition' with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer,
+  Publication-grade medical study guide and lecture transcription workflow (v5.8.1): enforces Multi-Image Slice & Composite Figure Extraction
+  Engine (extracts all substantive figures into fig_paths, stitches split table/diagram images into unified composite figures, and aggregates OCR across all image slices),
+  Three-Tier Multi-Agent Parallel Orchestration & Independent QA Critic Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis
+  via deterministic 'run_pipeline.py partition' with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer,
   and mandatory post-merge QA Critic Subagent inspection producing 'qa_audit_report.json'), Universal LaTeX Math & Scientific Symbol
   Sanitization Engine (converts LaTeX math delimiters and symbols like '$\ ge 1.0 $', '\ge', '\le', '\pm', '\times' into standard Unicode
   characters '≥', '≤', '±', '×', '°', 'µ' across slide boxes, bullets, and table cells with zero BiDi distortion), Multi-Format Resilient
@@ -27,10 +28,10 @@ description: >-
   Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local
   STT/Whisper/CUDA downloads), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 151-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 153-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.8.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.8.1)
 
 ## Overview
 
