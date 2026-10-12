@@ -2126,13 +2126,71 @@ def test_latex_math_in_slide_pair_verification():
     assert len(errors) == 0, f"Expected 0 errors for LaTeX-sanitized slide pair, got: {errors}"
 
 
+def test_verify_slide_alignment_flags_excessive_ref_note_proliferation(tmp_path):
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that verify_slide_alignment.py emits EXCESSIVE_REF_NOTE_PROLIFERATION
+    warning when more than 25% of lectured slides have ref_note boxes.
+    """
+    import json
+    import subprocess
+    import sys
 
+    raw_slides = []
+    trans_slides = []
 
+    # Generate 10 slides: 8 have long lectures (50+ words)
+    long_lecture = (
+        "استاد در این بخش به طور کامل و جامع فیزیولوژی و پاتوفیزیولوژی ترشح هورمون‌ها را تشریح کردند و "
+        "بر اهمیت تنظیم بازخوردی منفی محور هیپوتالاموس هیپوفیز تاکید نمودند و تمام مکانیزم‌های مرتبط را "
+        "با تمام جزییات بالینی و نکات دارویی و عوارض جانبی برای دانشجویان به تفصیل بیان فرمودند."
+    )
+    for i in range(1, 11):
+        raw_slides.append({
+            "slide_number": i,
+            "title_raw": f"Endocrine Topic {i}",
+            "text_lines": [f"Endocrine physiological concept {i}"],
+            "has_tables": False
+        })
+        # 6 out of 10 slides have ref_note (60% proliferation, exceeding the 25% threshold)
+        has_ref = (i <= 6)
+        trans_slides.append({
+            "slide_number": i,
+            "title_fa": f"مبحث غدد {i}",
+            "title_en": f"Endocrine Topic {i}",
+            "bullets": [
+                {"lead": "نکته اصلی", "text": f"مفهوم فیزیولوژی غدد شماره {i} با جزییات بالینی"}
+            ],
+            "spoken_lecture": long_lecture,
+            "ref_note": "شرح تکمیلی بر اساس رفرنس هاریسون جهت بررسی مکانیسم‌های سلولی مرتبط." if has_ref else ""
+        })
 
+    raw_path = tmp_path / "raw.json"
+    trans_path = tmp_path / "trans.json"
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+    trans_path.write_text(json.dumps(trans_slides), encoding="utf-8")
 
+    diag_file = tmp_path / "slide_alignment_report.json"
+    script = os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py")
+    res = subprocess.run(
+        [
+            sys.executable,
+            script,
+            "--raw",
+            str(raw_path),
+            "--translated",
+            str(trans_path),
+            "--diagnostic-json",
+            str(diag_file),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
+    assert diag_file.exists()
+    diag = json.loads(diag_file.read_text(encoding="utf-8"))
+    warn_types = [w.get("warning_type") for w in diag.get("warnings", [])]
 
-
-
-
-
-
+    assert "EXCESSIVE_REF_NOTE_PROLIFERATION" in warn_types, (
+        f"Expected EXCESSIVE_REF_NOTE_PROLIFERATION warning in {warn_types}"
+    )

@@ -833,7 +833,13 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     sp.paragraph_format.space_before = Pt(0)
     sp.paragraph_format.space_after = Pt(3)
 
-    if ref_note and not is_ceremonial:
+    spoken_lecture_text = slide_data.get("spoken_lecture", "") or ""
+    spoken_word_count = len(spoken_lecture_text.split())
+    is_skip = bool(slide_data.get("is_skipped") or slide_data.get("unvoiced") or slide_data.get("skipped_by_professor"))
+    needs_exp = bool(slide_data.get("needs_reference_expansion"))
+    should_suppress_ref = (spoken_word_count >= 60 and not is_skip and not needs_exp)
+
+    if ref_note and not is_ceremonial and not should_suppress_ref:
         # Track 3: Separate, dedicated Reference Note Callout Box (OUTSIDE Slide Box table)
         ref_tbl = doc.add_table(rows=1, cols=1)
         ref_tblPr = ref_tbl._tbl.tblPr

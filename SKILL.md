@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.8.1): enforces Multi-Image Slice & Composite Figure Extraction
+  Publication-grade medical study guide and lecture transcription workflow (v5.8.2): enforces Multi-Image Slice & Composite Figure Extraction
   Engine (extracts all substantive figures into fig_paths, stitches split table/diagram images into unified composite figures, and aggregates OCR across all image slices),
   Three-Tier Multi-Agent Parallel Orchestration & Independent QA Critic Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis
   via deterministic 'run_pipeline.py partition' with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer,
@@ -21,17 +21,18 @@ description: >-
   suppressing redundant English screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA
   strictly enforce atomic cell-by-cell table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT
   prevents parametric memory hallucination of non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts
-  parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Universal Reference
+  parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Reference Note Anti-Proliferation
+  Gate & Auto-Suppression Engine (EXCESSIVE_REF_NOTE_PROLIFERATION restricts supplementary notes strictly to skipped or sparse-lecture slides <30-40 words), Universal Reference
   Note Sanitization & Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept
   Denominator Filtering (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart
   Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata
   Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local
   STT/Whisper/CUDA downloads), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 153-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 155-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.8.1)
+# Medical Lecture Transcriber & Study Guide Generator (v5.8.2)
 
 ## Overview
 
@@ -83,6 +84,7 @@ Medical study guides require 100% verifiable source provenance. Students must im
    - **Tier 3 — `[💡 شرح تکمیلی رفرنس ({ref_book_name})]` (Track 3):**
      Supplementary commentary strictly reserved for unvoiced, skipped, or under-explained slides.
      - Clearly distinguished by royal purple `#6C3483` lead and italic charcoal styling, separated from professor remarks.
+     - **انضباط شدید و منع تکثیر بی‌رویه (Anti-Proliferation & Strict Discipline Rule):** فیلد `ref_note` منحصراً و اکیداً مختص اسلایدهایی است که یا استاد آن‌ها را تدریس نکرده و رد شده است (`is_skipped: true`)، یا توضیحات استاد در ویس بسیار کم و گذرا بوده است (< 30-40 کلمه)، و یا یک فرمول/مسیر متابولیک کلیدی در اسلاید آمده که اصلاً در کلام استاد گفته نشده است (`needs_reference_expansion: true`). برای تمام اسلایدهایی که استاد توضیحات کامل و مکفی ارائه داده است، فیلد `ref_note` باید حتماً خالی (`""`) باشد. تزریق بی‌رویه کادرهای بنفش بعد از هر اسلاید تخلف محسوب شده و توسط گیت `EXCESSIVE_REF_NOTE_PROLIFERATION` شناسایی می‌شود (اگر بیش از ۲۵٪ اسلایدهای تدریس‌شده دارای `ref_note` باشند، گیت اخطار صادر می‌کند و موتور پایپ‌لاین و کامپایلر Word آن را به صورت خودکار خنثی می‌کنند).
      - **قانون حیاتی عدم تکرار تیتر (Pure Scientific Content Rule):** مقدار فیلد `ref_note` در ساختار داده‌های JSON منحصراً باید حاوی «متن خالص توضیحات علمی» باشد. هرگز نباید عبارات تیتر نظیر `💡 شرح تکمیلی رفرنس...:`، نام کتاب مرجع، یا ایموجی را در مقدار `ref_note` بنویسید؛ زیرا موتور رندرینگ Word (`create_slide_pamphlet.py`) این سرتیتر را به همراه نام کتاب مرجع و رنگ بنفش شاهانه به صورت خودکار و مستقل درج می‌کند. موتور پایپ‌لاین به تابع پالایش خودکار (`sanitize_ref_note`) مجهز است تا در صورت تزریق سهوی پیشوند، آن را به طور خودکار بزداید و از پدیده تکرار دوگانه تیتر (Dual Prepending) پیشگیری کند.
 
 2. **Strict Unvoiced & Skipped Slide Protocol:**

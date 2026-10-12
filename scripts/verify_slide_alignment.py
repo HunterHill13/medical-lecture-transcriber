@@ -1288,10 +1288,13 @@ def main():
                 warnings.append(issue["message"])
                 diagnostics["warnings"].append(issue)
 
-    # Check 4: Mandatory ref_note verification and Grounding/Hallucination Check
+    # Check 4: Mandatory ref_note verification, Grounding/Hallucination Check & Anti-Proliferation
     ref_corpus_chunks = load_ref_corpus(args.ref_corpus) if args.ref_corpus else []
     if args.ref_corpus:
         print(f"• Reference Corpus Loaded: {len(ref_corpus_chunks)} text chunks for ref_note grounding check.")
+
+    total_lectured_slides = 0
+    lectured_slides_with_ref_note = []
 
     for num in range(1, min(total_raw, total_trans) + 1):
         trans_item = trans_db[num]
@@ -1302,6 +1305,14 @@ def main():
             
         ref_note = trans_item.get("ref_note", "").strip()
         is_skipped = bool(trans_item.get("is_skipped") or trans_item.get("unvoiced") or trans_item.get("skipped_by_professor"))
+        needs_exp = bool(trans_item.get("needs_reference_expansion"))
+        spoken_words = len(trans_item.get("spoken_lecture", "").split())
+
+        if not is_skipped and spoken_words >= 40:
+            total_lectured_slides += 1
+            if ref_note and not needs_exp:
+                lectured_slides_with_ref_note.append(num)
+
         if is_skipped:
             ref_words = len(ref_note.split())
             if not ref_note:
@@ -1381,6 +1392,26 @@ def main():
                         "slide_number": num,
                         "message": warn_msg
                     })
+
+    if total_lectured_slides >= 4:
+        ratio = len(lectured_slides_with_ref_note) / total_lectured_slides
+        if ratio > 0.25:
+            warn_msg = (
+                f"EXCESSIVE REF NOTE PROLIFERATION: {len(lectured_slides_with_ref_note)} of {total_lectured_slides} "
+                f"({ratio*100:.1f}%) lectured slides have supplementary 'ref_note'. "
+                f"'ref_note' is strictly reserved for skipped/unvoiced slides (<30-40 spoken words) or essential unvoiced pathways. "
+                f"Affected slides: {lectured_slides_with_ref_note}"
+            )
+            warnings.append(warn_msg)
+            diagnostics["warnings"].append({
+                "warning_type": "EXCESSIVE_REF_NOTE_PROLIFERATION",
+                "total_lectured": total_lectured_slides,
+                "ref_note_count": len(lectured_slides_with_ref_note),
+                "ratio": ratio,
+                "slides": lectured_slides_with_ref_note,
+                "message": warn_msg,
+                "remediation_action": "Omit 'ref_note' (set to \"\") on slides where professor already delivered a full lecture."
+            })
 
     print("-" * 65)
     if warnings:

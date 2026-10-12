@@ -573,3 +573,62 @@ def test_bug5_build_pamphlet_accepts_dict_wrapped_raw_slides_and_table_aliases(t
     )
     assert out_docx.exists()
 
+
+def test_sanitize_slide_object_suppresses_ref_note_on_fully_lectured_slides():
+    """
+    Regression Test:
+    Verifies that _sanitize_slide_object suppresses (clears) ref_note on slides where the
+    professor gave a full, comprehensive lecture (>= 60 words), but preserves ref_note
+    on unvoiced/skipped slides, sparse lectures (< 60 words), or slides with needs_reference_expansion.
+    """
+    from batch_orchestrator import _sanitize_slide_object
+
+    long_lecture = " ".join(["کلمه"] * 75)
+    short_lecture = " ".join(["کلمه"] * 25)
+
+    # 1. Fully lectured slide without expansion flag -> ref_note must be cleared
+    slide_fully_lectured = {
+        "slide_number": 5,
+        "title_fa": "مبحث کامل",
+        "spoken_lecture": long_lecture,
+        "ref_note": "شرح اضافه کتاب هاریسون که نباید چاپ شود.",
+        "bullets": []
+    }
+    cleaned_1 = _sanitize_slide_object(slide_fully_lectured)
+    assert cleaned_1["ref_note"] == "", f"Expected ref_note to be cleared, got: {cleaned_1['ref_note']}"
+
+    # 2. Sparse lecture (< 60 words) -> ref_note must be preserved
+    slide_sparse = {
+        "slide_number": 6,
+        "title_fa": "مبحث گذرا",
+        "spoken_lecture": short_lecture,
+        "ref_note": "مکانیسم عملکرد متفورمین از طریق فعال‌سازی AMPK در بافت کبد است.",
+        "bullets": []
+    }
+    cleaned_2 = _sanitize_slide_object(slide_sparse)
+    assert cleaned_2["ref_note"] == "مکانیسم عملکرد متفورمین از طریق فعال‌سازی AMPK در بافت کبد است."
+
+    # 3. Unvoiced / skipped slide -> ref_note must be preserved
+    slide_skipped = {
+        "slide_number": 7,
+        "title_fa": "اسلاید تدریس نشده",
+        "is_skipped": True,
+        "spoken_lecture": long_lecture,
+        "ref_note": "اطلاعات بالینی ضروری از کتاب رفرنس برای درک پاتولوژی هیپوفیز.",
+        "bullets": []
+    }
+    cleaned_3 = _sanitize_slide_object(slide_skipped)
+    assert cleaned_3["ref_note"] == "اطلاعات بالینی ضروری از کتاب رفرنس برای درک پاتولوژی هیپوفیز."
+
+    # 4. Explicitly flagged needs_reference_expansion -> ref_note must be preserved
+    slide_flagged = {
+        "slide_number": 8,
+        "title_fa": "مبحث با نیاز تکمیلی",
+        "spoken_lecture": long_lecture,
+        "needs_reference_expansion": True,
+        "ref_note": "فرمول محاسبه کلیرنس کراتینین بر اساس فرمول کوکرافت-گالت.",
+        "bullets": []
+    }
+    cleaned_4 = _sanitize_slide_object(slide_flagged)
+    assert cleaned_4["ref_note"] == "فرمول محاسبه کلیرنس کراتینین بر اساس فرمول کوکرافت-گالت."
+

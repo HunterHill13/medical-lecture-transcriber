@@ -132,6 +132,15 @@ def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرن
 
     if isinstance(s.get("ref_note"), str) and s["ref_note"].strip():
         s["ref_note"] = sanitize_ref_note(sanitize_latex_math(s["ref_note"]))
+        
+        # Anti-proliferation check: suppress ref_note if professor gave full lecture (>= 60 words)
+        # unless explicitly flagged for reference expansion or skipped/unvoiced.
+        spoken_txt = s.get("spoken_lecture", "") or ""
+        spoken_wcnt = len(spoken_txt.split())
+        is_skip = bool(s.get("is_skipped") or s.get("unvoiced") or s.get("skipped_by_professor"))
+        needs_exp = bool(s.get("needs_reference_expansion"))
+        if spoken_wcnt >= 60 and not is_skip and not needs_exp:
+            s["ref_note"] = ""
 
     if isinstance(s.get("bullets"), list):
         clean_bullets = []
@@ -312,6 +321,10 @@ def partition_slides(
                 ),
                 "rule_4_unicode_math": (
                     "Strictly use direct Unicode symbols (≥, ≤, ±, ×, °, µ, →). NEVER use LaTeX math ($...$, \\ge, \\le)."
+                ),
+                "rule_5_ref_note_discipline": (
+                    "'ref_note' is strictly reserved for slides where the professor gave NO explanation or very brief/sparse explanation (< 30-40 words), or skipped the slide entirely ('is_skipped': true). "
+                    "If the professor gave a full, comprehensive explanation, you MUST leave 'ref_note': \"\" (empty string). Do NOT add supplementary reference notes indiscriminately."
                 ),
             },
             "halo_prev": halo_prev,
@@ -676,12 +689,40 @@ def run_qa_preflight_and_validate(
         except Exception:
             pass
 
+    # Audit ref_note density on lectured slides
+    lectured_with_ref = []
+    total_lectured_count = 0
+    for s_num, t_s in trans_by_num.items():
+        is_skip = bool(t_s.get("is_skipped") or t_s.get("unvoiced") or t_s.get("skipped_by_professor"))
+        spk_words = len(t_s.get("spoken_lecture", "").split())
+        needs_exp = bool(t_s.get("needs_reference_expansion"))
+        if not is_skip and spk_words >= 40:
+            total_lectured_count += 1
+            if t_s.get("ref_note", "").strip() and not needs_exp:
+                lectured_with_ref.append(s_num)
+
+    ref_note_proliferation_flag = (
+        total_lectured_count >= 4 and (len(lectured_with_ref) / total_lectured_count) > 0.25
+    )
+    if ref_note_proliferation_flag:
+        structural_issues.append({
+            "slide_number": lectured_with_ref[0] if lectured_with_ref else 0,
+            "issue": "EXCESSIVE_REF_NOTE_PROLIFERATION",
+            "detail": f"{len(lectured_with_ref)} of {total_lectured_count} lectured slides have 'ref_note'. 'ref_note' is strictly reserved for skipped or sparse-lecture slides (<30-40 words). Affected: {lectured_with_ref}",
+        })
+
     os.makedirs(batches_dir, exist_ok=True)
     dossier = {
         "total_raw_slides": len(raw_by_num),
         "total_translated_slides": len(trans_by_num),
         "table_audit_targets": table_audit_targets,
         "visual_audit_targets": visual_audit_targets,
+        "ref_note_audit": {
+            "total_lectured_slides": total_lectured_count,
+            "lectured_slides_with_ref_note": lectured_with_ref,
+            "proliferation_ratio": (len(lectured_with_ref) / total_lectured_count) if total_lectured_count else 0.0,
+            "excessive_proliferation_flag": ref_note_proliferation_flag,
+        },
         "batch_boundary_pairs": boundary_pairs,
         "preflight_structural_issues": structural_issues,
         "qa_report_expected_path": _to_posix(qa_report_path),
@@ -692,7 +733,7 @@ def run_qa_preflight_and_validate(
             "defects": [
                 {
                     "slide_number": 0,
-                    "category": "TABLE_FORMAT | SLIDE_ALIGNMENT | NUMERICAL_OMISSION | LECTURE_FIDELITY | BOUNDARY_DRIFT",
+                    "category": "TABLE_FORMAT | SLIDE_ALIGNMENT | NUMERICAL_OMISSION | LECTURE_FIDELITY | BOUNDARY_DRIFT | REF_NOTE_PROLIFERATION",
                     "severity": "ERROR | WARNING",
                     "description": "Exact explanation of defect",
                     "remediation": "Exact fix required in translated_slides.json",
