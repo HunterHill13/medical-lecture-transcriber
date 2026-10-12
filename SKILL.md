@@ -1,7 +1,10 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.7.3): enforces Universal LaTeX Math & Scientific Symbol
+  Publication-grade medical study guide and lecture transcription workflow (v5.8.0): enforces Three-Tier Multi-Agent Parallel Orchestration
+  & Independent QA Critic Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis via deterministic
+  'run_pipeline.py partition' with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer,
+  and mandatory post-merge QA Critic Subagent inspection producing 'qa_audit_report.json'), Universal LaTeX Math & Scientific Symbol
   Sanitization Engine (converts LaTeX math delimiters and symbols like '$\ ge 1.0 $', '\ge', '\le', '\pm', '\times' into standard Unicode
   characters '≥', '≤', '±', '×', '°', 'µ' across slide boxes, bullets, and table cells with zero BiDi distortion), Multi-Format Resilient
   Table Rendering Engine (renders both 2D raw list rows and dict rows in Word with automatic column width safety and zero IndexError),
@@ -24,14 +27,14 @@ description: >-
   Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local
   STT/Whisper/CUDA downloads), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 139-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 144-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.7.3)
+# Medical Lecture Transcriber & Study Guide Generator (v5.8.0)
 
 ## Overview
 
-This skill provides an end-to-end, publication-grade medical pair-programming and study-guide generation workflow. It synthesizes live class audio lectures with PowerPoint (`.pptx`) or PDF (`.pdf`) presentation slides into a beautifully styled Microsoft Word study guide (`.docx`) and structured Markdown transcripts, governed by strict page index invariance, tri-partite provenance attribution, substantive audio coverage, and visual fidelity protocols.
+This skill provides an end-to-end, publication-grade medical pair-programming and study-guide generation workflow. It synthesizes live class audio lectures with PowerPoint (`.pptx`) or PDF (`.pdf`) presentation slides into a beautifully styled Microsoft Word study guide (`.docx`) and structured Markdown transcripts, governed by strict page index invariance, tri-partite provenance attribution, substantive audio coverage, visual fidelity protocols, and a **Three-Tier Multi-Agent Parallel Orchestration & QA Critic Subagent Architecture**.
 
 ---
 
@@ -275,11 +278,11 @@ uv run python scripts/verify_slide_alignment.py --raw raw_slides.json --translat
    ```
    این اسکریپت فایل صوتی طولانی را به چانک‌های کوچک زیر ۱۰ مگابایت با همپوشانی ۱۰ ثانیه‌ای در پوشه `chunks/` تقسیم کرده و مانیفست `chunks_manifest.json` را می‌سازد.
 
-2. **گام دوم — پیاده‌سازی چانک‌ها با مدل جمینای (یکی از دو روش زیر):**
-   * **روش الف — مستقیم درون سشن آنتی‌گرویتی با ابزار `view_file` (روش پیشنهادی و پیش‌فرض ایجنت‌ها):**
+2. **گام دوم — پیاده‌سازی موازی چانک‌ها با مدل جمینای (یکی از دو روش زیر):**
+   * **روش الف — پیاده‌سازی موازی با ساب‌ایجنت‌ها درون سشن آنتی‌گرویتی (`invoke_subagent` + `view_file` — روش پیش‌فرض و فوق‌سریع):**
      ابزار `view_file` به صورت مادری از فایل‌های باینری صوتی (`.m4a`, `.mp3`, `.wav`) تا سقف ۱۰۰ مگابایت پشتیبانی می‌کند.
-     ایجنت به سادگی چانک‌های سبک را تک‌تک با `view_file(AbsolutePath=".../chunks/chunk_01.m4a")` مشاهده می‌کند. مدل جمینای کانتکست چندرسانه‌ای را مستقیماً می‌شنود و متن پیاده‌سازی‌شده کلمه به کلمه فارسی را همراه با اصطلاحات تخصصی انگلیسی و بازه زمانی تولید می‌کند.
-     سپس ایجنت خروجی هر چانک را در `transcripts/part01.txt`، `transcripts/part02.txt` و... ذخیره می‌نماید.
+     - **قانون موازی‌سازی صوتی (Parallel Audio Transcription):** اگر تعداد چانک‌های صوتی بیش از ۲ چانک باشد، ایجنت اصلی **نباید** تک‌تک چانک‌ها را به صورت ترتیبی و کند در سشن اصلی پیاده کند! بلکه موظف است در **یک فراخوانی واحد `invoke_subagent`**، چانک‌ها را به دسته‌های ۲ تا ۳ تایی تقسیم کرده و به ساب‌ایجنت‌های موازی (`TypeName="self"`, `Model="inherit"`) بسپارد.
+     - هر ساب‌ایجنت صوتی منحصراً چانک‌های تخصیص‌یافته خود (مثلاً `chunk_01.m4a` تا `chunk_03.m4a`) را با `view_file` می‌شنود و متن پیاده‌سازی‌شده کلمه به کلمه فارسی را همراه با اصطلاحات تخصصی انگلیسی، اعداد و بازه‌های زمانی دقیق در فایل‌های مجزای `transcripts/part01.txt`، `transcripts/part02.txt` و... ذخیره می‌نماید.
    * **روش ب — پیاده‌سازی خودکار ابری با کلید جمینای:**
      چنانچه متغیر محیطی `GEMINI_API_KEY` در سیستم تنظیم شده باشد:
      ```powershell
@@ -404,7 +407,7 @@ In addition to slide alignment, Track 1 narrative text and audio timestamps must
 ---
 
 ### N. Central Pipeline Orchestrator (`run_pipeline.py`)
-برای جلوگیری از خطای ترتیب اجرای اسکریپت‌ها و نظارت بر چرخه کامل، از ارکستریتور مرکزی استفاده کنید:
+برای جلوگیری از خطای ترتیب اجرای اسکریپت‌ها و نظارت بر چرخه کامل چندایجنتی و کنترل کیفی، از ارکستریتور مرکزی استفاده کنید:
 ```powershell
 # 1. مشاهده داشبورد وضعیت و گام بعدی پیشنهادی
 uv run python scripts/run_pipeline.py status
@@ -415,36 +418,92 @@ uv run python scripts/run_pipeline.py extract --presentation slides.pdf
 # 3. قطعه‌بندی هوشمند صوت با همپوشانی ایمن
 uv run python scripts/run_pipeline.py chunk --audio lecture.m4a
 
-# 4. پیاده‌سازی هوشمند صوت با جمینای (یا مشاهده تک‌تک چانک‌ها با view_file در سشن چت)
+# 4. پیاده‌سازی هوشمند صوت با جمینای (موازی‌سازی چانک‌ها با invoke_subagent + view_file یا اسکریپت ابری)
 # ⛔ اکیداً ممنوع: هرگز Whisper یا بسته‌های CUDA لوکال را نصب نکنید!
 uv run python scripts/run_pipeline.py transcribe
 
-# 5. اعتبارسنجی انطباق اسلایدها قبل از ساخت سند
+# 5. افراز خودکار اسلایدها به دسته‌های ۱۰ تا ۱۲تایی همراه با هاله متنی (Context Halo) در پوشه batches/
+uv run python scripts/run_pipeline.py partition --batch-size 12 --halo-size 1
+
+# 6. [اجرای موازی ساب‌ایجنت‌های نگارش اسلاید با invoke_subagent روی batches/batch_XX_YY_raw.json]
+# هر ساب‌ایجنت خروجی خود را منحصراً در batches/translated_batch_XX_YY.json می‌نویسد.
+
+# 7. ادغام قطعی، حذف هاله متنی، پالایش نمادهای لاتک و اعتبارسنجی مرزی در translated_slides.json
+uv run python scripts/run_pipeline.py merge-batches --ref-book هاریسون
+
+# 8. تولید پرونده ممیزی برای ساب‌ایجنت کنترل کیفی (QA Critic) و بررسی گزارش qa_audit_report.json
+uv run python scripts/run_pipeline.py qa-check --require-report
+
+# 9. اعتبارسنجی انطباق اسلایدها قبل از ساخت سند
 uv run python scripts/run_pipeline.py verify-slides
 
-# 6. ساخت سند نهایی با تشخیص خودکار کتاب مرجع رشته
+# 10. ساخت سند نهایی با تشخیص خودکار کتاب مرجع رشته
 uv run python scripts/run_pipeline.py build --output lecture_pamphlet.docx
 
-# 7. اعتبارسنجی جامع انطباق صوت و گفتار روی سند ساخته‌شده
+# 11. اعتبارسنجی جامع انطباق صوت و گفتار روی سند ساخته‌شده
 uv run python scripts/run_pipeline.py verify-lecture --docx lecture_pamphlet.docx
 
 # 💡 یا اجرای یکجای کل چرخه گواهی‌شده (Verify Slides -> Build -> Verify Lecture):
 uv run python scripts/run_pipeline.py publish --output lecture_pamphlet.docx
 
-# 7. (حالت Mode B) تزریق ساختاریافته نکات به سند موجود
+# 12. (حالت Mode B) تزریق ساختاریافته نکات به سند موجود
 uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations notes.json --output annotated_pamphlet.docx
 ```
 
 ---
 
-### O. Strict Batch Size Limit & Semantic Drift Prevention Protocol (سقف اندازه دسته‌های ترجمه و منع انحراف معنایی)
-1. **The Semantic Drift Trap in Large Batches (انحراف معنایی در دسته‌های حجیم):**
-   - هنگامی که ایجنت در یک پرامپت منفرد اقدام به ترجمه ۳۰ تا ۵۰ اسلاید به صورت یکجا می‌کند، مدل پس از اسلاید ۲۰ دچار خستگی توجه (Attention Fatigue) شده و به جای وفاداری به متن اسلاید خام، شروع به انحراف معنایی (Semantic Drift) و جایگزین کردن متون اصلی با تئوری‌های کلی کتاب مرجع می‌کند.
-   - این پدیده علت اصلی خطاهای عدم تطابق (`OFFSET_SHIFT` و صفر شدن همپوشانی توکن‌ها) در گیت اعتبارسنجی است.
-2. **Mandatory Batch Size Limit (سقف قطعی حداکثر ۱۰ تا ۱۵ اسلاید در هر نوبت):**
-   - ایجنت‌ها **موظفند** اسلایدها را در دسته‌های کوچک حداکثر ۱۰ تا ۱۵تایی ترجمه کرده و در فایل JSON ذخیره نمایند (مثلاً اسلایدهای ۱ تا ۱۵، سپس ۱۶ تا ۳۰ و...).
-3. **Strict Lexical Grounding to `raw_slides.json`:**
-   - هر بالت فارسی در `translated_slides.json` باید دقیقاً ترجمه وفادارانه یکی از سطرهای `text_lines` در `raw_slides.json` (یا استخراج چشمی تصویر برای اسلایدهای تصویری) باشد. تغییر خودسرانه ساختار و متون اسلایدها اکیداً ممنوع است.
+### O. Three-Tier Multi-Agent Parallel Orchestration & Independent QA Critic Subagent Protocol (معماری موازی‌سازی سه‌سطحی با ساب‌ایجنت‌ها و ساب‌ایجنت ممیز کنترل کیفی — v5.8.0)
+
+1. **ریشه‌یابی کندی و خستگی توجه در اجرای تک‌ایجنتی (Why Single-Agent Sequential Execution Fails):**
+   - هنگامی که یک ایجنت به تنهایی و به صورت ترتیبی اقدام به پیاده‌سازی ۸ تا ۱۲ چانک صوتی و ترجمه/سنتز ۳۰ تا ۸۰ اسلاید در یک پنجره متنی واحد می‌کند، هم زمان تولید جزوه به شدت طولانی می‌شود و هم مدل پس از اسلاید ۱۵ دچار خستگی توجه (**Context Rot / Attention Fatigue**) شده و شروع به خلاصه‌سازی جداول، جا انداختن اعداد، یا انحراف معنایی (`Semantic Drift`) می‌کند.
+
+2. **قانون آستانه هوشمند فعال‌سازی موازی‌سازی + الزام همیشگی کنترل کیفی (Mandatory Activation Threshold):**
+   - **شرط اجبار موازی‌سازی (`multi_agent_mandatory: true`):** برای هر جلسه‌ای که دارای **بیش از ۱۲ اسلاید** (`total_slides > 12`) یا **بیش از ۲ چانک صوتی** (`total_audio_chunks > 2`) باشد، اجرای معماری چندایجنتی موازی با ابزار `invoke_subagent` **اکیداً الزامی (MANDATORY)** است. (برای جلسات بسیار کوتاه ۱۲ اسلاید یا کمتر، می‌توان نگارش را در ۱ دسته انجام داد).
+   - **الزام همیشگی ساب‌ایجنت ممیز کنترل کیفی (Mandatory QA Critic Subagent):** در **تمامی جزوه‌ها** (چه بزرگ و چه کوچک)، پس از تولید `translated_slides.json` و پیش از تحویل نهایی فایل Word، فراخوانی ساب‌ایجنت مستقل کنترل کیفی (`Medical Study Guide QA Critic`) جهت ممیزی تطابق اسلایدها، فرمت جداول و حفظ اعداد **الزامی** است.
+
+3. **معماری سه‌سطحی موازی‌سازی با `invoke_subagent` (Three-Tier Map-Reduce & QA Critic Architecture):**
+
+   - **سطح اول — ساب‌ایجنت‌های موازی پیاده‌سازی ویس (Tier 1: Parallel Audio Transcriber Subagents):**
+     - پس از اجرای `run_pipeline.py chunk` و `run_pipeline.py partition`، اگر متغیر `GEMINI_API_KEY` تنظیم نشده و بیش از ۲ چانک صوتی وجود دارد، ایجنت اصلی بر اساس آرایه `audio_transcription_groups` در `batches/batches_manifest.json`، در **یک فراخوانی واحد `invoke_subagent`** چندین ساب‌ایجنت موازی (`TypeName="self"`, `Model="inherit"`) راه‌اندازی می‌کند.
+     - هر ساب‌ایجنت ۲ تا ۳ چانک صوتی مجزا (مثلاً `chunks/chunk_01.m4a` تا `chunks/chunk_03.m4a`) را با `view_file` می‌شنود و ترنسکریپت کامل و وفادارانه فارسی را همراه با اصطلاحات انگلیسی، دوزها، اعداد و تایم‌استمپ‌ها در فایل‌های مجزای `transcripts/partXX.txt` ذخیره می‌کند.
+
+   - **سطح دوم — افراز قطعی، هاله متنی و ساب‌ایجنت‌های موازی نگارش دسته‌های اسلاید (Tier 2: Deterministic Partitioning & Parallel Slide-Batch Worker Subagents):**
+     - **گام الف (`partition`):** ایجنت اصلی دستور زیر را اجرا می‌کند:
+       ```powershell
+       uv run python scripts/run_pipeline.py partition --batch-size 12 --halo-size 1
+       ```
+       این دستور فایل `raw_slides.json` را به دسته‌های ۱۲ اسلایدی مجزا (`batches/batch_01_12_raw.json`، `batches/batch_13_24_raw.json` و...) تقسیم کرده و به هر دسته **۱ اسلاید هاله متنی فقط-خواندنی** قبل و بعد (`halo_prev` و `halo_next`) و لیست دقیق اسلایدهای نیازمند بینایی ماشین (`mandatory_vision_slides`) و اسلایدهای دارای جدول (`mandatory_table_slides`) را الصاق می‌کند.
+     - **گام ب (`invoke_subagent` موازی برای تمام دسته‌ها هم‌زمان):** ایجنت اصلی در **یک فراخوانی واحد `invoke_subagent`**، به ازای هر دسته در `batches_manifest.json` یک ساب‌ایجنت موازی (`TypeName="self"`, `Model="inherit"`) با نقش `Slide Batch Worker [Start..End]` فراخوانی می‌کند.
+     - **۵ قانون آهنین ایزوله‌سازی ساب‌ایجنت‌های نگارش اسلاید:**
+       1. **منع مطلق نوشتن مستقیم در `translated_slides.json` (Zero Shared-File Contention):** هر ساب‌ایجنت منحصراً مجاز است در فایل شارد اختصاصی خود (`batches/translated_batch_XX_YY.json`) بنویسد.
+       2. **ثبات مطلق شماره اسلایدها (`expected_slide_numbers`):** ساب‌ایجنت باید دقیقاً همان شماره اسلایدهای موجود در `expected_slide_numbers` را بدون جا انداختن یا تغییر شماره تولید کند. اسلایدهای `halo_prev` و `halo_next` صرفاً برای آگاهی از ادامه یافتن خوشه‌های تدریس (`parent_lecture_slide`) در مرز دسته‌ها هستند و نباید در خروجی شارد نوشته شوند (و حتی اگر سهواً نوشته شوند، دستور `merge-batches` آن‌ها را خودکار حذف می‌کند).
+       3. **اجبار فراخوانی `view_file` روی تصاویر اسلایدهای بصری و جدولی دسته:** هر ساب‌ایجنت موظف است روی تمام تصاویر اسلایدهای درج‌شده در `mandatory_vision_slides` و `mandatory_table_slides` ابزار `view_file` را فراخوانی کند.
+       4. **فرمت اجباری جداول (`table_data`):** برای هر اسلایدی که در `mandatory_table_slides` قرار دارد (یا در تصویر آن جدول دیده می‌شود)، ساب‌ایجنت **موظف** است ساختار کامل جدول را در فیلد `"table_data": {"headers": [...], "rows": [...]}` به صورت سلول‌به‌سلول و بدون خلاصه‌سازی وارد کند (تبدیل جداول به بالت‌های متنی ساده اکیداً ممنوع است).
+       5. **منع نمادهای لاتک:** استفاده از یونیکد مستقیم (`≥`, `≤`, `±`, `×`, `°`, `µ`, `→`) الزامی و استفاده از `$ ... $` یا `\ge` ممنوع است.
+     - **گام ج (`merge-batches`):** پس از اتمام کار تمام ساب‌ایجنت‌های دسته، ایجنت اصلی دستور زیر را اجرا می‌کند:
+       ```powershell
+       uv run python scripts/run_pipeline.py merge-batches --ref-book هاریسون
+       ```
+       این دستور به صورت اتمی و قطعی تمام شاردهای `batches/translated_batch_*.json` را بررسی و ادغام کرده، هاله‌های متنی اضافی را حذف می‌کند، زنجیره‌های خوشه‌ای `parent_lecture_slide` در مرز دسته‌ها را یکپارچه می‌سازد، تکرار احتمالی `spoken_lecture` در مرز دو دسته را حذف می‌کند، نمادهای ریاضی و `ref_note` را پالایش می‌نماید و فایل واحد `translated_slides.json` و گزارش `batches/merge_report.json` را تولید می‌کند.
+
+   - **سطح سوم — گیت‌های پایتونی + ساب‌ایجنت مستقل ممیز کنترل کیفی (Tier 3: Deterministic Gates + Independent QA Critic Subagent):**
+     - **گام الف (تولید پرونده ممیزی و اجرای گیت اسلاید):**
+       ```powershell
+       uv run python scripts/run_pipeline.py qa-check
+       uv run python scripts/run_pipeline.py verify-slides
+       ```
+       دستور `qa-check` به صورت خودکار فایل `batches/qa_target_dossier.json` را می‌سازد که لیست دقیق تمام اسلایدهای دارای جدول (`table_audit_targets`)، اسلایدهای تصویری (`visual_audit_targets`)، مرزهای بین دسته‌ها (`batch_boundary_pairs`) و خطاهای ساختاری پیش‌پرواز را مشخص می‌کند.
+     - **گام ب (فراخوانی ساب‌ایجنت ممیز کنترل کیفی — `QA Critic Subagent`):**
+       ایجنت اصلی با `invoke_subagent` یک ساب‌ایجنت ممیز مستقل (`Role="Medical Study Guide QA Critic"`, `TypeName="self"`, `Model="inherit"`) فراخوانی می‌کند.
+       - **وظایف ساب‌ایجنت کنترل کیفی (QA Critic):**
+         1. خواندن `batches/qa_target_dossier.json`، `raw_slides.json` و `translated_slides.json`.
+         2. مشاهده تصاویر اسلایدهای دارای جدول (`table_audit_targets`) با `view_file` و بررسی اینکه آیا تمامی جداول به فرمت جدول استاندارد (`table_data` دارای `headers` و `rows` کامل) نوشته شده‌اند و هیچ ردیف یا ستونی جا نیفتاده یا به متن عادی تبدیل نشده است.
+         3. بررسی تطابق ۱ به ۱ شماره اسلایدها (Page Index Invariance) و عدم جابجایی محتوای اسلایدها نسبت به فایل اصلی.
+         4. بررسی حفظ دقیق اعداد، درصدها، نسبت‌های اپیدمیولوژیک، دوزها و نبود کدهای خام لاتک (`$\ge$`).
+         5. بررسی مرزهای بین دسته‌ها (`batch_boundary_pairs`) جهت اطمینان از عدم تکرار یا قطع ناگهانی توضیحات استاد (`spoken_lecture`).
+         6. نوشتن گزارش رسمی ممیزی در فایل `qa_audit_report.json` با وضعیت `"status": "PASSED"` یا `"status": "NEEDS_FIXES"` به همراه لیست دقیق `defects`.
+     - **گام ج (حلقه اصلاح هدفمند و انتشار نهایی):**
+       - اگر `qa_audit_report.json` حاوی ایرادی باشد (`NEEDS_FIXES`)، ایجنت اصلی موظف است اسلایدهای معیوب مشخص‌شده را در `translated_slides.json` اصلاح کرده و مجدداً `uv run python scripts/run_pipeline.py qa-check --require-report` و سپس `uv run python scripts/run_pipeline.py publish --output lecture_pamphlet.docx` را اجرا نماید تا تمامی گیت‌ها با موفقیت ۱۰۰٪ عبور کنند.
 
 ---
 
@@ -1148,6 +1207,8 @@ def render_harrison_table(parent_cell, headers, items):
 Before concluding any study guide generation task, the agent **MUST** verify each item:
 
 - [ ] **Dual-Engine Presentation Extraction Executed:** Extracted all slides from PPTX or PDF into `raw_slides.json` using `scripts/extract_presentation.py` (with visual-aware ONNX OCR triggered on any slide bearing visual images, charts, smartart, or PDF tables, robust confidence thresholding >= 0.60, and native vs. scanned table differentiation).
+- [ ] **Three-Tier Multi-Agent Parallel Execution (`partition` -> `invoke_subagent` -> `merge-batches`) Executed:** For presentations with >12 slides or >2 audio chunks, partitioned slides into 10–12 slide batches with 1-slide Context Halo (`run_pipeline.py partition`), spawned parallel Audio & Slide-Batch Worker Subagents writing exclusively to isolated `batches/translated_batch_*.json` shards, and merged them via `run_pipeline.py merge-batches` with zero index gaps or boundary duplicates.
+- [ ] **Independent QA Critic Subagent Audit Passed (`qa_audit_report.json`):** Executed `run_pipeline.py qa-check`, invoked the independent `Medical Study Guide QA Critic` subagent to visually inspect all table/diagram slides, verify 1-to-1 slide alignment, confirm every table is formatted in `table_data` (headers + rows), and confirmed `qa_audit_report.json` has `"status": "PASSED"`.
 - [ ] **Strict Page Index Invariance Verified:** Slide Box N strictly corresponds to Presentation Page N across all 1 to total_pages. Zero dropped or merged slides.
 - [ ] **Automated Slide Alignment Gate Passed:** `scripts/verify_slide_alignment.py` executed and passed with exit code 0 (mandatory >= 50% substantive recall rate on raw tokens >= 4, Slide Numerical & Statistical Data Preservation Gate strictly enforcing epidemiological numbers, ratios, and percentages, Source Exclusivity gate preventing ungrounded textbook/drug injections into Track 2, zero false phantom hallucination, and strict slide text immutability without audio/reference leakage).
 - [ ] **Substantive Audio & Concept Coverage Gate Passed:** `scripts/verify_lecture_alignment.py` executed and passed with exit code 0, verifying chronology, duration bounds, keyword matching, and clinical substance density.

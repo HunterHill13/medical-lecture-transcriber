@@ -7,10 +7,14 @@ Commands:
     status         Inspect workspace artifacts, pipeline progress, and show next steps.
     extract        Extract raw slides and images from PPTX or PDF.
     chunk          Split lecture audio into lightweight chunks.
+    partition      Partition raw_slides.json into isolated batches with Context Halo for parallel subagents.
+    merge-batches  Validate and merge subagent batch shards into translated_slides.json.
+    qa-check       Generate QA Critic target dossier and validate qa_audit_report.json.
     verify-slides  Validate slide index invariance, counts, and ref_notes.
     verify-lecture Validate audio timestamps, concept density, and track isolation.
     verify         Run both slide and lecture verification gates.
     build          Build the final publication-grade Word document.
+    publish        Certified publication pipeline: verify -> build -> post-verify.
     annotate       Inject structured RTL callout notes into existing DOCX (Mode B).
     all            Execute full deterministic pipeline (extract -> chunk -> verify -> build).
 
@@ -18,6 +22,9 @@ Usage:
     uv run python scripts/run_pipeline.py status
     uv run python scripts/run_pipeline.py extract --presentation slides.pdf
     uv run python scripts/run_pipeline.py chunk --audio lecture.m4a
+    uv run python scripts/run_pipeline.py partition --batch-size 12
+    uv run python scripts/run_pipeline.py merge-batches
+    uv run python scripts/run_pipeline.py qa-check
     uv run python scripts/run_pipeline.py verify
     uv run python scripts/run_pipeline.py build --output lecture_pamphlet.docx
     uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations notes.json
@@ -26,6 +33,7 @@ Usage:
 import os
 import sys
 import glob
+import json
 import shutil
 import argparse
 import subprocess
@@ -95,6 +103,11 @@ def check_status(args):
     trans_files = glob.glob("transcripts/*.txt") + glob.glob("scratch/*.txt") + glob.glob("*transcript*.txt")
     trans_dir = os.path.dirname(trans_files[0]) if trans_files else None
     
+    # Multi-Agent Batches & QA Audit
+    batches_manifest = "batches/batches_manifest.json" if os.path.exists("batches/batches_manifest.json") else None
+    batch_shards = glob.glob("batches/translated_batch_*.json")
+    qa_report = "qa_audit_report.json" if os.path.exists("qa_audit_report.json") else None
+
     translated_slides = "translated_slides.json" if os.path.exists("translated_slides.json") else None
     annotations_file = find_first_match(["*annotation*.json", "annotations.json"])
     
@@ -113,9 +126,12 @@ def check_status(args):
     print(f"  • Slide Screenshots : {badge(slide_images, slide_images or 'slide_images/')}")
     print(f"  • Audio Chunks      : {badge(chunks_dir, chunks_dir or 'chunks/')}")
 
-    print("\n[AI Pedagogical Content (LLM Tasks)]")
+    print("\n[Multi-Agent Parallel Execution & QA Critic]")
     print(f"  • Audio Transcripts : {badge(bool(trans_files), f'{len(trans_files)} transcript chunk files' if trans_files else 'transcripts/*.txt')}")
-    print(f"  • Translated Slides : {badge(translated_slides, translated_slides or 'translated_slides.json')}")
+    print(f"  • Slide Batch Specs : {badge(batches_manifest, batches_manifest or 'batches/batches_manifest.json')}")
+    print(f"  • Translated Shards : {badge(bool(batch_shards), f'{len(batch_shards)} shard files in batches/' if batch_shards else 'batches/translated_batch_*.json')}")
+    print(f"  • Merged Slides JSON: {badge(translated_slides, translated_slides or 'translated_slides.json')}")
+    print(f"  • QA Critic Report  : {badge(qa_report, qa_report or 'qa_audit_report.json')}")
     print(f"  • Mode B Annotations: {badge(annotations_file, annotations_file or 'annotations.json')}")
 
     print("\n[Final Output & Verification]")
@@ -130,11 +146,15 @@ def check_status(args):
     elif not chunks_dir:
         print(f"   Run chunking:   uv run python scripts/run_pipeline.py chunk --audio \"{audio_file}\"")
     elif not trans_files:
-        print("   ⚡ MANDATORY: Transcribe audio chunks with Gemini Multimodal (view_file on chunks/chunk_XX.m4a or scripts/transcribe_chunks.py). DO NOT install Whisper/CUDA!")
-    elif not translated_slides:
-        print("   Translate extracted slides into 'translated_slides.json' matching raw slide count.")
+        print("   ⚡ MANDATORY: Transcribe audio chunks with parallel Gemini Subagents (invoke_subagent + view_file on chunks/chunk_XX.m4a) or scripts/transcribe_chunks.py. DO NOT install Whisper/CUDA!")
+    elif not batches_manifest and not translated_slides:
+        print("   Partition slides for parallel subagents: uv run python scripts/run_pipeline.py partition --batch-size 12")
+    elif batches_manifest and not translated_slides:
+        print("   Spawn parallel Slide-Batch Subagents via invoke_subagent for each batch in batches/, then run: uv run python scripts/run_pipeline.py merge-batches")
+    elif not qa_report:
+        print("   Run verification & invoke the QA Critic Subagent to audit tables/slides and produce 'qa_audit_report.json': uv run python scripts/run_pipeline.py qa-check")
     else:
-        print("   Run verification and compile docx: uv run python scripts/run_pipeline.py build")
+        print("   Run certified publication (verify + build + post-verify): uv run python scripts/run_pipeline.py publish")
     print("-" * 65)
 
 def cmd_extract(args):
@@ -163,6 +183,45 @@ def cmd_transcribe(args):
     if args.api_key:
         cmd.extend(["--api-key", args.api_key])
     return 0 if run_cmd(cmd, "Transcribing audio chunks via Gemini") else 1
+
+def cmd_partition(args):
+    script = os.path.join(SCRIPTS_DIR, "batch_orchestrator.py")
+    cmd = get_py_runner() + [
+        script, "partition",
+        "--raw", args.raw,
+        "--batches-dir", args.batches_dir,
+        "--batch-size", str(args.batch_size),
+        "--halo-size", str(args.halo_size),
+        "--img-dir", args.img_dir,
+        "--chunks-manifest", args.chunks_manifest,
+    ]
+    return 0 if run_cmd(cmd, f"Partitioning {args.raw} into isolated subagent batches (batch_size={args.batch_size}, halo={args.halo_size})") else 1
+
+def cmd_merge_batches(args):
+    script = os.path.join(SCRIPTS_DIR, "batch_orchestrator.py")
+    cmd = get_py_runner() + [
+        script, "merge-batches",
+        "--batches-dir", args.batches_dir,
+        "--raw", args.raw,
+        "--output", args.output,
+        "--ref-book", args.ref_book,
+    ]
+    if getattr(args, "no_strict", False):
+        cmd.append("--no-strict")
+    return 0 if run_cmd(cmd, f"Validating and merging batch shards from {args.batches_dir} into {args.output}") else 1
+
+def cmd_qa_check(args):
+    script = os.path.join(SCRIPTS_DIR, "batch_orchestrator.py")
+    cmd = get_py_runner() + [
+        script, "qa-check",
+        "--raw", args.raw,
+        "--translated", args.translated,
+        "--batches-dir", args.batches_dir,
+        "--qa-report", args.qa_report,
+    ]
+    if getattr(args, "require_report", False):
+        cmd.append("--require-report")
+    return 0 if run_cmd(cmd, "Running QA Critic Target Preflight & Audit Report Check") else 1
 
 def cmd_verify_slides(args):
     raw = args.raw or "raw_slides.json"
@@ -352,6 +411,31 @@ def main():
     p_transcribe.add_argument("--model", default="gemini-2.0-flash", help="Gemini model name")
     p_transcribe.add_argument("--api-key", default=None, help="Gemini API Key")
 
+    # partition
+    p_partition = subparsers.add_parser("partition", help="Partition raw_slides.json into isolated batches with Context Halo for parallel subagents")
+    p_partition.add_argument("--raw", default="raw_slides.json", help="Path to raw_slides.json")
+    p_partition.add_argument("--batches-dir", default="batches", help="Directory for batch specs and shards")
+    p_partition.add_argument("--batch-size", type=int, default=12, help="Number of slides per batch (default 12)")
+    p_partition.add_argument("--halo-size", type=int, default=1, help="Number of read-only context halo slides (default 1)")
+    p_partition.add_argument("--img-dir", default="slide_images", help="Slide images directory")
+    p_partition.add_argument("--chunks-manifest", default="chunks_manifest.json", help="Audio chunks manifest path")
+
+    # merge-batches
+    p_merge = subparsers.add_parser("merge-batches", help="Validate and merge parallel subagent batch shards into translated_slides.json")
+    p_merge.add_argument("--batches-dir", default="batches", help="Directory containing batch shards")
+    p_merge.add_argument("--raw", default="raw_slides.json", help="Path to raw_slides.json")
+    p_merge.add_argument("--output", default="translated_slides.json", help="Output path for merged translated_slides.json")
+    p_merge.add_argument("--ref-book", default="رفرنس", help="Reference book name for ref_note sanitization")
+    p_merge.add_argument("--no-strict", action="store_true", help="Write output even if non-fatal batch errors exist")
+
+    # qa-check
+    p_qa = subparsers.add_parser("qa-check", help="Generate QA Critic target dossier and validate qa_audit_report.json")
+    p_qa.add_argument("--raw", default="raw_slides.json", help="Path to raw_slides.json")
+    p_qa.add_argument("--translated", default="translated_slides.json", help="Path to translated_slides.json")
+    p_qa.add_argument("--batches-dir", default="batches", help="Directory for QA target dossier")
+    p_qa.add_argument("--qa-report", default="qa_audit_report.json", help="Path to QA Critic Subagent JSON report")
+    p_qa.add_argument("--require-report", action="store_true", help="Fail with exit code 1 if qa_audit_report.json is missing or not PASSED")
+
     # verify-slides
     p_vslides = subparsers.add_parser("verify-slides", help="Validate slide alignment and index invariance")
     p_vslides.add_argument("--raw", default="raw_slides.json", help="Path to raw_slides.json")
@@ -464,6 +548,12 @@ def main():
             sys.exit(cmd_chunk(args))
         elif args.command == "transcribe":
             sys.exit(cmd_transcribe(args))
+        elif args.command == "partition":
+            sys.exit(cmd_partition(args))
+        elif args.command == "merge-batches":
+            sys.exit(cmd_merge_batches(args))
+        elif args.command == "qa-check":
+            sys.exit(cmd_qa_check(args))
         elif args.command == "verify-slides":
             sys.exit(cmd_verify_slides(args))
         elif args.command == "verify-lecture":
