@@ -27,7 +27,7 @@ description: >-
   Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Gemini Multimodal Audio Transcription Protocol (strictly prohibits local
   STT/Whisper/CUDA downloads), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 149-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 151-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
 # Medical Lecture Transcriber & Study Guide Generator (v5.8.0)

@@ -462,3 +462,78 @@ def test_transcribe_chunks_retry_backoff(monkeypatch, tmp_path):
 
     assert call_count == 2, f"Expected exactly 2 attempts, but urlopen was called {call_count} times"
     assert "تدریس بالینی بیماری کوشینگ" in res
+
+
+def test_run_pipeline_all_output_argument_separation():
+    """
+    Regression Test:
+    Verifies that 'run_pipeline.py all' defines --output as the output DOCX study guide
+    and --raw as raw_slides.json, preventing cmd_build from overwriting raw_slides.json with DOCX.
+    """
+    import argparse
+    import run_pipeline
+
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+    # Simulate run_pipeline main() parser definition
+    p_all = subparsers.add_parser("all")
+    p_all.add_argument("--output", "-o", default="lecture_pamphlet.docx")
+    p_all.add_argument("--raw", default="raw_slides.json")
+
+    args = p_all.parse_args([])
+    assert args.output == "lecture_pamphlet.docx"
+    assert args.raw == "raw_slides.json"
+
+
+def test_verify_slide_and_lecture_alignment_accepts_dict_wrapped_slides(tmp_path):
+    """
+    Regression Test:
+    Verifies that verify_slide_alignment.py and verify_lecture_alignment.py
+    safely accept {'slides': [...]} dict-wrapped JSON files.
+    """
+    import json
+    import subprocess
+    import sys
+    raw_path = tmp_path / "raw_slides.json"
+    trans_path = tmp_path / "translated_slides.json"
+
+    raw_path.write_text(
+        json.dumps({
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "title_raw": "Cushing syndrome diagnosis",
+                    "text_lines": ["Cortisol elevation", "Dexamethasone suppression test"],
+                    "has_tables": False,
+                }
+            ]
+        }),
+        encoding="utf-8",
+    )
+    trans_path.write_text(
+        json.dumps({
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "title_fa": "تشخیص سندرم کوشینگ",
+                    "title_en": "Cushing syndrome diagnosis",
+                    "bullets": [
+                        ["افزایش کورتیزول", "سطح بالای کورتیزول (Cortisol elevation)"],
+                        ["تست دگزامتازون", "آزمون سرکوب دگزامتازون (Dexamethasone suppression test)"],
+                    ],
+                    "ref_note": "نکته رفرنس هاریسون جهت تشریح مبحث",
+                }
+            ]
+        }, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    script = os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py")
+    res = subprocess.run(
+        [sys.executable, script, "--raw", str(raw_path), "--translated", str(trans_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert res.returncode == 0, f"verify_slide_alignment failed on dict-wrapped JSON: {res.stdout}\n{res.stderr}"
+

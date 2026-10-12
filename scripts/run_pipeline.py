@@ -163,7 +163,8 @@ def cmd_extract(args):
         print("❌ Error: No presentation file found. Specify with --presentation <file.pptx/.pdf>")
         return 1
     script = os.path.join(SCRIPTS_DIR, "extract_presentation.py")
-    cmd = get_py_runner() + [script, "--input", pres, "--output", args.output, "--img-dir", args.img_dir]
+    out_json = getattr(args, "raw", None) or args.output or "raw_slides.json"
+    cmd = get_py_runner() + [script, "--input", pres, "--output", out_json, "--img-dir", args.img_dir]
     return 0 if run_cmd(cmd, f"Extracting presentation from {pres}") else 1
 
 def cmd_chunk(args):
@@ -370,6 +371,7 @@ def cmd_all(args):
             return 1
         if cmd_build(args) != 0:
             return 1
+        args.docx = getattr(args, "docx", None) or args.output or "lecture_pamphlet.docx"
         res_l = cmd_verify_lecture(args)
         if res_l != 0:
             print("❌ Error: Lecture alignment verification failed. Terminating pipeline.")
@@ -518,7 +520,7 @@ def main():
     p_all = subparsers.add_parser("all", help="Execute complete deterministic flow")
     p_all.add_argument("--presentation", "-p")
     p_all.add_argument("--audio", "-a")
-    p_all.add_argument("--output", "-o", default="raw_slides.json")
+    p_all.add_argument("--output", "-o", default="lecture_pamphlet.docx", help="Path to output .docx study guide")
     p_all.add_argument("--img-dir", default="./slide_images")
     p_all.add_argument("--output-dir", default="./chunks")
     p_all.add_argument("--chunk-len", type=int, default=540)

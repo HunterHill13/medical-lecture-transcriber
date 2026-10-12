@@ -333,7 +333,9 @@ def _check_structural_extras(num: int, raw_item: dict, trans_item: dict, issues:
         })
         
     has_tbl = bool(raw_item.get("has_tables") or raw_item.get("has_image_table") or trans_item.get("has_table"))
-    td = trans_item.get("table_data")
+    td = trans_item.get("table_data") or trans_item.get("structured_tables") or trans_item.get("reference_tables")
+    if isinstance(td, list) and len(td) >= 1 and isinstance(td[0], dict):
+        td = td[0]
     if has_tbl and not td:
         err_msg = f"MISSING TABLE DATA at Slide {num}: Presentation slide contains a structured or visual table, but 'table_data' is missing from translated_slides.json!"
         issues.append({
@@ -434,7 +436,9 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
             trans_bullet_texts.append(b_txt)
 
     trans_table_texts = []
-    td = trans_item.get("table_data")
+    td = trans_item.get("table_data") or trans_item.get("structured_tables") or trans_item.get("reference_tables")
+    if isinstance(td, list) and len(td) >= 1 and isinstance(td[0], dict):
+        td = td[0]
     if td:
         if isinstance(td, dict):
             headers = td.get("headers", [])
@@ -1107,9 +1111,11 @@ def main():
         sys.exit(1)
         
     with open(args.raw, "r", encoding="utf-8") as f:
-        raw_list = json.load(f)
+        raw_data = json.load(f)
+        raw_list = raw_data.get("slides", []) if isinstance(raw_data, dict) else raw_data
     with open(args.translated, "r", encoding="utf-8") as f:
-        trans_list = json.load(f)
+        trans_data = json.load(f)
+        trans_list = trans_data.get("slides", []) if isinstance(trans_data, dict) else trans_data
         
     errors = []
     warnings = []
@@ -1131,7 +1137,11 @@ def main():
         if not isinstance(item, dict):
             err_msg = f"MALFORMED RAW SLIDE: Item at index {idx} in raw_slides.json is not a valid JSON dict!"
             errors.append(err_msg)
-            diagnostics["errors"].append({"error_type": "SCHEMA_VALIDATION_ERROR", "message": err_msg})
+            diagnostics["errors"].append({
+                "error_type": "SCHEMA_VALIDATION_ERROR",
+                "message": err_msg,
+                "remediation_action": "Ensure raw_slides.json contains a list of slide dicts.",
+            })
             continue
         val = item.get("slide_number")
         try:
@@ -1168,7 +1178,11 @@ def main():
         if not isinstance(item, dict):
             err_msg = f"MALFORMED TRANSLATED SLIDE: Item at index {idx} in translated_slides.json is not a valid JSON dict!"
             errors.append(err_msg)
-            diagnostics["errors"].append({"error_type": "SCHEMA_VALIDATION_ERROR", "message": err_msg})
+            diagnostics["errors"].append({
+                "error_type": "SCHEMA_VALIDATION_ERROR",
+                "message": err_msg,
+                "remediation_action": "Ensure translated_slides.json contains a list of slide dicts.",
+            })
             continue
         val = item.get("slide_number")
         try:
@@ -1384,8 +1398,9 @@ def main():
             
         print("\n💡 ACTIONABLE REMEDIATION HINTS:")
         for diag in diagnostics["errors"]:
-            print(f"   • [{diag['error_type']}] Slide {diag.get('slide_number', 'N/A')}: {diag['remediation_action']}")
-            diagnostics["remediation_hints"].append(diag['remediation_action'])
+            remed = diag.get("remediation_action", diag.get("message", "Review slide alignment."))
+            print(f"   • [{diag['error_type']}] Slide {diag.get('slide_number', 'N/A')}: {remed}")
+            diagnostics["remediation_hints"].append(remed)
             
         # Write JSON diagnostic
         try:

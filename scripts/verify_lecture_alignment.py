@@ -1044,7 +1044,8 @@ def main():
     if trans_json and os.path.exists(trans_json):
         try:
             with open(trans_json, "r", encoding="utf-8") as f:
-                s_data = json.load(f)
+                s_raw = json.load(f)
+                s_data = s_raw.get("slides", []) if isinstance(s_raw, dict) else s_raw
             json_spoken_text = " ".join(flatten_spoken_lecture(s.get("spoken_lecture", "")) for s in s_data if isinstance(s, dict) and s.get("spoken_lecture"))
         except Exception:
             pass
@@ -1216,7 +1217,8 @@ def main():
     if args.raw_slides and os.path.exists(args.raw_slides):
         try:
             with open(args.raw_slides, "r", encoding="utf-8") as f:
-                raw_slides_data = json.load(f)
+                r_raw = json.load(f)
+                raw_slides_data = r_raw.get("slides", []) if isinstance(r_raw, dict) else r_raw
             leaked_count = 0
             for slide in raw_slides_data:
                 s_num = slide.get("slide_number", "?")
