@@ -1413,6 +1413,25 @@ def main():
                 "remediation_action": "Omit 'ref_note' (set to \"\") on slides where professor already delivered a full lecture."
             })
 
+    # Check 5: Multi-Agent Parallel Orchestration Compliance Guard
+    if total_slides > 12:
+        manifest_file = "batches/batches_manifest.json"
+        merge_file = "batches/merge_report.json"
+        if not os.path.exists(manifest_file) and not os.path.exists(merge_file):
+            mono_warn = (
+                f"MONOLITHIC_EXECUTION_DETECTED: Presentation has {total_slides} slides (> 12 threshold), "
+                "but no parallel subagent batch manifest ('batches/batches_manifest.json') or merge report was found! "
+                "Writing 12+ slides in a single session causes attention rot and table omissions. "
+                "Enforce Three-Tier Multi-Agent Parallel Orchestration via 'run_pipeline.py partition' & invoke_subagent."
+            )
+            warnings.append(mono_warn)
+            diagnostics["warnings"].append({
+                "warning_type": "MONOLITHIC_EXECUTION_DETECTED",
+                "total_slides": total_slides,
+                "message": mono_warn,
+                "remediation_action": "Run 'run_pipeline.py partition --batch-size 12' and launch parallel Slide-Batch Worker subagents via invoke_subagent."
+            })
+
     print("-" * 65)
     if warnings:
         print(f"⚠️  {len(warnings)} Advisory Warnings:")

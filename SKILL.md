@@ -40,6 +40,22 @@ This skill provides an end-to-end, publication-grade medical pair-programming an
 
 ---
 
+## ⚡ 0. MANDATORY EXECUTION ARCHITECTURE: MULTI-AGENT PARALLEL ORCHESTRATION (STRICT ENFORCEMENT)
+
+> ⛔ **قانون حیاتی و خط قرمز نحوه اجرا (MANDATORY EXECUTION LAW):**
+> هیچ ایجنتی تحت هیچ شرایطی حق ندارد جلسات بیش از ۱۲ اسلاید یا بیش از ۲ چانک صوتی را به صورت «تک‌ایجنتی، ترتیبی و خطی در سشن اصلی» پیش ببرد!
+> اجرای تک‌ایجنتی در سشن اصلی باعث کندی شدید، پایان کانتکست، خستگی توجه مدل (Attention Fatigue)، تلخیص جداول و افت دقت می‌شود.
+> 
+> **الزام گام‌به‌گام برای ایجنت اصلی (Strict Orchestration Protocol):**
+> ۱. **مرحله صوت (اگر بیش از ۲ چانک است):** پس از `chunk`، فوراً با یک فراخوانی واحد `invoke_subagent`، چانک‌ها را بین ساب‌ایجنت‌های موازی (`TypeName="self"`) تقسیم کنید تا هر کدام هم‌زمان فایل‌های خود را با `view_file` پیاده کنند.
+> ۲. **مرحله اسلایدها (اگر بیش از ۱۲ اسلاید است):** فوراً دستور `run_pipeline.py partition --batch-size 12` را اجرا کرده و سپس در **یک فراخوانی واحد `invoke_subagent`** تمام دسته‌ها (`batch_01_12`، `batch_13_24` و...) را هم‌زمان به ساب‌ایجنت‌های نگارش بسپارید. ایجنت اصلی **هرگز نباید خودش اسلایدها را در `translated_slides.json` بنویسد!**
+> ۳. **مرحله ادغام:** پس از اتمام کار ساب‌ایجنت‌ها، `run_pipeline.py merge-batches` را اجرا کنید.
+> ۴. **مرحله کنترل کیفی:** دستور `run_pipeline.py qa-check` را اجرا کرده و با `invoke_subagent` ساب‌ایجنت ممیز (`Role="Medical Study Guide QA Critic"`) را فراخوانی کنید تا فایل `qa_audit_report.json` تولید شود.
+> 
+> **تخلف صریح:** هرگونه نگارش مستقیم اسلایدها یا پیاده‌سازی ترتیبی ویس توسط ایجنت اصلی در سشن جاری، نقض مستقیم اسکیل است و گیت‌های خروجی با هشدار سخت‌گیرانه `MONOLITHIC_EXECUTION_DETECTED` آن را مسدود یا پرچم‌گذاری می‌کنند.
+
+---
+
 ## 🎨 1. MASTER COLOR & TYPOGRAPHY SPECIFICATION (STRICT MANDATORY)
 
 Every agent implementing this skill **MUST** strictly adhere to the following color palette and typography rules without deviation:
