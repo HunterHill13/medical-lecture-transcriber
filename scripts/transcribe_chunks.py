@@ -50,68 +50,98 @@ def get_mime_type(file_path: str) -> str:
     }
     return mapping.get(ext, "audio/mp4")
 
-def transcribe_chunk_with_gemini_rest(chunk_path: str, api_key: str, model: str = "gemini-2.0-flash", max_retries: int = 3, retry_delay: float = 2.0) -> str:
+DEFAULT_PRIMARY_MODEL = "gemini-flash-latest"
+DEFAULT_FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash", "gemini-3-flash-preview"]
+
+def transcribe_chunk_with_gemini_rest(
+    chunk_path: str,
+    api_key: str,
+    model: str = DEFAULT_PRIMARY_MODEL,
+    fallback_models: list = None,
+    max_retries: int = 3,
+    retry_delay: float = 2.0
+) -> str:
     """
-    Transcribes an audio chunk using standard library urllib with exponential backoff retry.
+    Transcribes an audio chunk using standard library urllib with exponential backoff retry
+    and dynamic model fallback (gemini-flash-latest -> gemini-3.8-flash -> gemini-3.5-flash).
     Retries automatically on HTTP 429 (rate limit / quota), HTTP 503, or network connection timeouts.
+    If a model is deprecated (404) or quota is exhausted (429), seamlessly cascades to fallback models.
     """
     if not os.path.exists(chunk_path):
         raise FileNotFoundError(f"Audio chunk not found: {chunk_path}")
+
+    if fallback_models is None:
+        fallback_models = [m for m in DEFAULT_FALLBACK_MODELS if m != model]
         
     mime_type = get_mime_type(chunk_path)
     with open(chunk_path, "rb") as f:
         audio_b64 = base64.b64encode(f.read()).decode("utf-8")
-        
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": MEDICAL_TRANSCRIPTION_PROMPT},
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": audio_b64
-                        }
-                    }
-                ]
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.2
-        }
-    }
-    
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    
+
+    models_to_try = [model] + [m for m in fallback_models if m != model]
     last_err = None
-    for attempt in range(1, max_retries + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=180) as resp:
-                res_json = json.loads(resp.read().decode("utf-8"))
-                candidates = res_json.get("candidates", [])
-                if candidates and "content" in candidates[0]:
-                    parts = candidates[0]["content"].get("parts", [])
-                    text_result = "".join(p.get("text", "") for p in parts)
-                    return text_result.strip()
-                return ""
-        except urllib.error.HTTPError as e:
-            last_err = e
-            if e.code in (429, 500, 502, 503, 504) and attempt < max_retries:
-                wait_sec = retry_delay * (2 ** (attempt - 1))
-                sys.stderr.write(f"⚠️ [Retry {attempt}/{max_retries}] HTTP {e.code} received from Gemini API. Backing off {wait_sec:.1f}s...\n")
-                time.sleep(wait_sec)
-                continue
-            raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
-            last_err = e
-            if attempt < max_retries:
-                wait_sec = retry_delay * (2 ** (attempt - 1))
-                sys.stderr.write(f"⚠️ [Retry {attempt}/{max_retries}] Network error: {e}. Retrying in {wait_sec:.1f}s...\n")
-                time.sleep(wait_sec)
-                continue
-            raise
+
+    for current_model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": MEDICAL_TRANSCRIPTION_PROMPT},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": audio_b64
+                            }
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.2
+            }
+        }
+        
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        
+        model_succeeded = False
+        for attempt in range(1, max_retries + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=180) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    candidates = res_json.get("candidates", [])
+                    if candidates and "content" in candidates[0]:
+                        parts = candidates[0]["content"].get("parts", [])
+                        text_result = "".join(p.get("text", "") for p in parts)
+                        return text_result.strip()
+                    return ""
+            except urllib.error.HTTPError as e:
+                last_err = e
+                # If 404 (deprecated/not found), break immediately to try next model in fallback list
+                if e.code == 404 and current_model != models_to_try[-1]:
+                    sys.stderr.write(f"⚠️ Model '{current_model}' unavailable (HTTP 404). Cascading to next fallback model...\n")
+                    break
+                if e.code in (429, 500, 502, 503, 504):
+                    if attempt < max_retries:
+                        wait_sec = retry_delay * (2 ** (attempt - 1))
+                        sys.stderr.write(f"⚠️ [Retry {attempt}/{max_retries}] HTTP {e.code} received for {current_model}. Backing off {wait_sec:.1f}s...\n")
+                        time.sleep(wait_sec)
+                        continue
+                    elif current_model != models_to_try[-1]:
+                        sys.stderr.write(f"⚠️ Model '{current_model}' quota exhausted (HTTP {e.code}). Cascading to next fallback model...\n")
+                        break
+                raise
+            except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+                last_err = e
+                if attempt < max_retries:
+                    wait_sec = retry_delay * (2 ** (attempt - 1))
+                    sys.stderr.write(f"⚠️ [Retry {attempt}/{max_retries}] Network error for {current_model}: {e}. Retrying in {wait_sec:.1f}s...\n")
+                    time.sleep(wait_sec)
+                    continue
+                elif current_model != models_to_try[-1]:
+                    sys.stderr.write(f"⚠️ Network error on '{current_model}'. Cascading to next fallback model...\n")
+                    break
+                raise
 
     if last_err:
         raise last_err
@@ -122,7 +152,7 @@ def main():
     parser.add_argument("--manifest", default="chunks_manifest.json", help="Path to chunks_manifest.json")
     parser.add_argument("--chunks-dir", default="./chunks", help="Directory containing audio chunks")
     parser.add_argument("--output-dir", default="./transcripts", help="Output directory for text transcripts")
-    parser.add_argument("--model", default="gemini-2.0-flash", help="Gemini model name")
+    parser.add_argument("--model", default=DEFAULT_PRIMARY_MODEL, help="Gemini model name (default: gemini-flash-latest)")
     parser.add_argument("--api-key", default=None, help="Gemini API Key (optional, defaults to GEMINI_API_KEY or GOOGLE_API_KEY env vars)")
     args = parser.parse_args()
 

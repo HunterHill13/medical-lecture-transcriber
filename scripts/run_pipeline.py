@@ -410,7 +410,7 @@ def main():
     p_transcribe.add_argument("--manifest", default="chunks_manifest.json", help="Path to chunks manifest JSON")
     p_transcribe.add_argument("--chunks-dir", default="./chunks", help="Directory with audio chunks")
     p_transcribe.add_argument("--output-dir", default="./transcripts", help="Output directory for transcript text files")
-    p_transcribe.add_argument("--model", default="gemini-2.0-flash", help="Gemini model name")
+    p_transcribe.add_argument("--model", default="gemini-flash-latest", help="Gemini model name (default: gemini-flash-latest with fallback to gemini-3.8-flash)")
     p_transcribe.add_argument("--api-key", default=None, help="Gemini API Key")
 
     # partition

@@ -537,3 +537,69 @@ def test_verify_slide_and_lecture_alignment_accepts_dict_wrapped_slides(tmp_path
     )
     assert res.returncode == 0, f"verify_slide_alignment failed on dict-wrapped JSON: {res.stdout}\n{res.stderr}"
 
+
+def test_transcribe_chunks_dynamic_model_fallback(tmp_path, monkeypatch):
+    """
+    Regression Test (Phase 1 Feedback Loop):
+    Verifies that transcribe_chunks falls back from gemini-flash-latest to gemini-3.8-flash
+    when encountering HTTP 404 or 429 quota exhaustion.
+    """
+    import transcribe_chunks
+    import urllib.error
+    from unittest.mock import MagicMock
+    import io
+    import json
+
+    chunk_file = tmp_path / "test_chunk.m4a"
+    chunk_file.write_bytes(b"dummy audio binary data")
+
+    requested_urls = []
+
+    def fake_urlopen(req, timeout=180):
+        url = req.full_url
+        requested_urls.append(url)
+        if "gemini-flash-latest" in url:
+            # Simulate HTTP 429 Quota Exceeded on primary model
+            fp = io.BytesIO(b'{"error": {"code": 429, "message": "Quota exceeded for model gemini-flash-latest"}}')
+            raise urllib.error.HTTPError(
+                url=url,
+                code=429,
+                msg="Too Many Requests",
+                hdrs={},
+                fp=fp
+            )
+        else:
+            # Fallback model succeeds
+            mock_resp = MagicMock()
+            resp_data = {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {"text": "متن پیاده‌سازی‌شده با مدل جایگزین"}
+                            ]
+                        }
+                    }
+                ]
+            }
+            mock_resp.read.return_value = json.dumps(resp_data).encode("utf-8")
+            mock_resp.__enter__.return_value = mock_resp
+            return mock_resp
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+    res = transcribe_chunks.transcribe_chunk_with_gemini_rest(
+        str(chunk_file),
+        api_key="fake-key",
+        model="gemini-flash-latest",
+        fallback_models=["gemini-3.8-flash"],
+        max_retries=1,
+        retry_delay=0.01
+    )
+
+    assert any("gemini-flash-latest" in u for u in requested_urls)
+    assert any("gemini-3.8-flash" in u for u in requested_urls)
+    assert "متن پیاده‌سازی‌شده با مدل جایگزین" in res
+
+
