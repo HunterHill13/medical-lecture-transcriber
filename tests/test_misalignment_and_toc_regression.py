@@ -291,3 +291,154 @@ def test_verify_slide_alignment_detects_hallucinated_trailing_lecture_displaceme
     diag = json.loads(diag_file.read_text(encoding="utf-8"))
     warn_or_err = [w.get("error_type") or w.get("warning_type") or w.get("type") for w in diag.get("warnings", []) + diag.get("errors", [])]
     assert "HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT" in warn_or_err
+
+
+def test_verify_slide_alignment_detects_audio_leakage_into_slide_bullets(tmp_path):
+    """
+    Regression Test (Track Isolation Violation):
+    Raw slide has 2 lines. Subagent adds a 3rd bullet copied from the professor's spoken lecture.
+    verify_slide_alignment must catch this Track 1 -> Track 2 leakage (AUDIO_LEAKAGE_INTO_SLIDE_BOX or UNGROUNDED_SLIDE_BULLET).
+    """
+    import subprocess
+    raw_slides = [
+        {"slide_number": 1, "title_raw": "Intro", "text_lines": ["Intro"], "has_tables": False},
+        {
+            "slide_number": 2,
+            "title_raw": "Ovarian Physiology",
+            "text_lines": [
+                "Hypothalamic-pituitary axis regulation",
+                "Cyclic follicle development"
+            ],
+            "has_tables": False
+        }
+    ]
+
+    trans_slides = [
+        {"slide_number": 1, "title_fa": "مقدمه", "bullets": [["مقدمه", "مقدمه درس"]], "spoken_lecture": "مقدمه"},
+        {
+            "slide_number": 2,
+            "title_fa": "فیزیولوژی تخمدان",
+            "title_en": "Ovarian Physiology",
+            "bullets": [
+                {"lead": "تنظیم هورمونی:", "text": "تنظیم محور هیپوتالاموس هیپوفیز در کنترل ترشحات"},
+                {"lead": "تکامل فولیکول:", "text": "تکامل سیکلیک فولیکول در بافت تخمدان"},
+                {"lead": "ریزش اندومتر:", "text": "اگر بارداری رخ ندهد اندومتر ریزش کرده و خونریزی قاعدگی رخ می‌دهد."}
+            ],
+            "spoken_lecture": "استاد در این بخش توضیح دادند که اگر بارداری رخ ندهد اندومتر ریزش کرده و خونریزی قاعدگی رخ می‌دهد."
+        }
+    ]
+
+    raw_path = tmp_path / "raw.json"
+    trans_path = tmp_path / "trans.json"
+    diag_file = tmp_path / "report.json"
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+    trans_path.write_text(json.dumps(trans_slides), encoding="utf-8")
+
+    script = os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py")
+    subprocess.run(
+        [
+            sys.executable,
+            script,
+            "--raw",
+            str(raw_path),
+            "--translated",
+            str(trans_path),
+            "--diagnostic-json",
+            str(diag_file),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
+
+    assert diag_file.exists()
+    diag = json.loads(diag_file.read_text(encoding="utf-8"))
+    warn_or_err = [w.get("error_type") or w.get("warning_type") or w.get("type") for w in diag.get("warnings", []) + diag.get("errors", [])]
+    assert any(k in warn_or_err for k in ("AUDIO_LEAKAGE_INTO_SLIDE_BOX", "UNGROUNDED_SLIDE_BULLET", "BULLET_COUNT_INFLATION")), (
+        f"Expected audio leakage detection in {warn_or_err}"
+    )
+
+
+def test_verify_slide_alignment_detects_parametric_knowledge_bullet_fabrication(tmp_path):
+    """
+    Regression Test (Parametric Hallucination Leakage):
+    Raw slide has 1 brief line ('Absence of menses for 6 months').
+    Subagent fabricates an extra bullet from medical memory ('در سیکل‌های منظم ۳ ماه و در سیکل‌های نامنظم ۶ ماه ملاک تشخیص...').
+    verify_slide_alignment must catch this (PARAMETRIC_BULLET_FABRICATION or UNGROUNDED_SLIDE_BULLET or BULLET_COUNT_INFLATION).
+    """
+    import subprocess
+    raw_slides = [
+        {"slide_number": 1, "title_raw": "Intro", "text_lines": ["Intro"], "has_tables": False},
+        {
+            "slide_number": 2,
+            "title_raw": "Secondary Amenorrhea Criteria",
+            "text_lines": [
+                "Absence of menses for 6 months"
+            ],
+            "has_tables": False
+        }
+    ]
+
+    trans_slides = [
+        {"slide_number": 1, "title_fa": "مقدمه", "bullets": [["مقدمه", "مقدمه درس"]], "spoken_lecture": "مقدمه"},
+        {
+            "slide_number": 2,
+            "title_fa": "معیارهای آمنوره ثانویه",
+            "title_en": "Secondary Amenorrhea Criteria",
+            "bullets": [
+                {"lead": "معیار اصلی:", "text": "عدم وجود قاعدگی و منستروئیشن به مدت ۶ ماه کامل"},
+                {"lead": "معیار تکمیلی در سیکل منظم:", "text": "در سیکل‌های منظم عدم قاعدگی به مدت ۳ ماه متوالی و در سیکل‌های نامنظم ۶ ماه ملاک تشخیص قطعی آمنوره ثانویه است."}
+            ],
+            "spoken_lecture": "استاد فرمودند آمنوره ثانویه بر اساس طول مدت مشخص میشود."
+        }
+    ]
+
+    raw_path = tmp_path / "raw.json"
+    trans_path = tmp_path / "trans.json"
+    diag_file = tmp_path / "report.json"
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+    trans_path.write_text(json.dumps(trans_slides), encoding="utf-8")
+
+    script = os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py")
+    subprocess.run(
+        [
+            sys.executable,
+            script,
+            "--raw",
+            str(raw_path),
+            "--translated",
+            str(trans_path),
+            "--diagnostic-json",
+            str(diag_file),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
+
+    assert diag_file.exists()
+    diag = json.loads(diag_file.read_text(encoding="utf-8"))
+    warn_or_err = [w.get("error_type") or w.get("warning_type") or w.get("type") for w in diag.get("warnings", []) + diag.get("errors", [])]
+    assert any(k in warn_or_err for k in ("PARAMETRIC_BULLET_FABRICATION", "UNGROUNDED_SLIDE_BULLET", "BULLET_COUNT_INFLATION")), (
+        f"Expected parametric bullet fabrication detection in {warn_or_err}"
+    )
+
+
+def test_partition_slides_includes_rule_9_strict_bullet_fidelity(tmp_path):
+    """
+    Regression Test:
+    Ensures partition_slides instructs subagents strictly against adding extra bullets from
+    spoken lecture or medical memory (rule_9).
+    """
+    raw_path = tmp_path / "raw_slides.json"
+    batches_dir = tmp_path / "batches"
+
+    raw_slides = [{"slide_number": 1, "text_lines": ["Slide 1"]}]
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+
+    partition_slides(str(raw_path), str(batches_dir), batch_size=1)
+    b_raw = json.loads((batches_dir / "batch_01_01_raw.json").read_text(encoding="utf-8"))
+    instructions = b_raw.get("instructions", {})
+
+    assert "rule_9_slide_box_strict_fidelity_and_anti_enrichment" in instructions
+

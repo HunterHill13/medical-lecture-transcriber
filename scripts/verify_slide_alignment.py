@@ -42,7 +42,8 @@ from text_utils import (
     extract_clinical_facts,
     COMBINED_DIGITS,
     sanitize_presentation_text,
-    sanitize_latex_math
+    sanitize_latex_math,
+    expand_bilingual_concepts
 )
 
 # Clause markers that indicate full English prose/sentences inside parentheses
@@ -1074,6 +1075,136 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                                         f"the slide content without parametric memory hallucination."),
                             "remediation_action": f"Remove ungrounded item '{grade_match.group(0)}' from Slide {num} table_data."
                         })
+
+        # Check 3.4c: Per-Bullet Semantic Grounding, Audio Leakage & Bullet Count Inflation Audit
+        # Enforces Track Isolation (Track 1 Spoken Lecture vs Track 2 Slide Box) and prevents
+        # subagents from leaking spoken audio or fabricating extra bullets from parametric memory.
+        trans_bullets = trans_item.get("bullets", [])
+        if trans_bullets and not ceremonial and not is_pure_visual:
+            raw_all_lines = [raw_title] + list(raw_lines) + list(ocr_lines)
+            raw_all_text = " ".join(raw_all_lines)
+            raw_substantive_tokens = extract_substantive_tokens(raw_all_lines)
+            raw_expanded = expand_bilingual_concepts(raw_substantive_tokens)
+
+            # Incorporate allowed acronym components into raw_expanded
+            for rt in raw_substantive_tokens:
+                rtl = rt.lower()
+                if rtl in MEDICAL_ACRONYM_COMPONENTS:
+                    raw_expanded.update(MEDICAL_ACRONYM_COMPONENTS[rtl])
+                for acr, words in MEDICAL_ACRONYM_COMPONENTS.items():
+                    if rtl in words:
+                        raw_expanded.add(acr)
+                        raw_expanded.update(words)
+
+            raw_digits = set(re.findall(r'\d+', raw_all_text.translate(COMBINED_DIGITS)))
+
+            spoken_txt = trans_item.get("spoken_lecture", "") or ""
+            if isinstance(spoken_txt, list):
+                spoken_txt = " ".join(str(s) for s in spoken_txt)
+            spoken_norm = normalize_for_matching(spoken_txt).lower()
+            spoken_tokens = extract_substantive_tokens([spoken_txt])
+
+            num_raw_source_lines = len([l for l in raw_lines if l.strip()]) + len([l for l in ocr_lines if l.strip()])
+            is_student_review = bool(trans_item.get("needs_student_review", False))
+            sev = "warning" if (is_student_review and allow_review) else "error"
+
+            ungrounded_bullets = []
+            audio_leakage_bullets = []
+
+            for b_idx, b in enumerate(trans_bullets):
+                b_str = ""
+                if isinstance(b, dict):
+                    b_str = (b.get("lead", "") + " " + b.get("text", "")).strip()
+                elif isinstance(b, (tuple, list)):
+                    b_str = " ".join(str(x) for x in b).strip()
+                else:
+                    b_str = str(b).strip()
+
+                if not b_str or len(b_str.split()) < 2:
+                    continue
+
+                b_sub = extract_substantive_tokens([b_str])
+                b_all = extract_tokens([b_str])
+                b_digits = set(re.findall(r'\d+', b_str.translate(COMBINED_DIGITS)))
+
+                # Check grounding against raw slide
+                overlap_concept = evaluate_concept_overlap(raw_substantive_tokens, b_sub, b_str)
+                overlap_expanded = b_sub.intersection(raw_expanded)
+                overlap_direct = b_all.intersection(raw_substantive_tokens)
+                b_expanded = expand_bilingual_concepts(b_sub)
+                overlap_reverse = b_expanded.intersection(raw_substantive_tokens)
+
+                # Check for fabricated numbers
+                fabricated_digits = b_digits - raw_digits
+                clinical_fabricated_digits = {d for d in fabricated_digits if d != str(b_idx + 1) and (not d.isdigit() or int(d) != (b_idx + 1))}
+
+                is_grounded = bool(
+                    (overlap_concept or overlap_expanded or overlap_direct or overlap_reverse or (isinstance(b, dict) and b.get("source_refs")))
+                    and not (clinical_fabricated_digits and len(trans_bullets) > max(1, num_raw_source_lines))
+                )
+
+                if not is_grounded:
+                    # Check if ungrounded bullet leaked from spoken lecture
+                    leakage_tokens = b_sub.intersection(spoken_tokens)
+                    b_norm_snippet = normalize_for_matching(b_str)
+                    is_substr_leak = len(b_norm_snippet) >= 15 and any(
+                        b_norm_snippet[i:i+20] in spoken_norm
+                        for i in range(0, max(1, len(b_norm_snippet) - 20), 10)
+                    )
+
+                    if len(leakage_tokens) >= 2 or is_substr_leak or (len(leakage_tokens) >= 1 and len(b_sub) <= 2):
+                        audio_leakage_bullets.append((b_idx, b_str, leakage_tokens))
+                        issues.append({
+                            "type": "AUDIO_LEAKAGE_INTO_SLIDE_BOX",
+                            "error_type": "AUDIO_LEAKAGE_INTO_SLIDE_BOX",
+                            "severity": sev,
+                            "slide_number": num,
+                            "bullet_index": b_idx,
+                            "bullet_text": b_str,
+                            "common_spoken_terms": sorted(list(leakage_tokens)),
+                            "message": (
+                                f"AUDIO LEAKAGE INTO SLIDE BOX at Slide {num}, Bullet {b_idx + 1}: "
+                                f"Translated bullet introduces concepts '{b_str[:60]}...' that were never on Raw Slide {num}, "
+                                f"but were spoken in spoken_lecture ({sorted(list(leakage_tokens))[:4]})! "
+                                f"Track 2 slide box bullets must strictly mirror raw presentation lines; "
+                                f"spoken explanations belong exclusively in Track 1 (spoken_lecture)."
+                            ),
+                            "remediation_action": f"Remove ungrounded bullet {b_idx + 1} from Slide {num} bullets."
+                        })
+                    else:
+                        ungrounded_bullets.append((b_idx, b_str))
+                        issues.append({
+                            "type": "PARAMETRIC_BULLET_FABRICATION",
+                            "error_type": "PARAMETRIC_BULLET_FABRICATION",
+                            "severity": sev,
+                            "slide_number": num,
+                            "bullet_index": b_idx,
+                            "bullet_text": b_str,
+                            "message": (
+                                f"PARAMETRIC BULLET FABRICATION at Slide {num}, Bullet {b_idx + 1}: "
+                                f"Translated bullet '{b_str[:60]}...' has zero grounding in Raw Slide {num} "
+                                f"and was fabricated from external medical memory! Track 2 slide box bullets must strictly "
+                                f"mirror the presentation slide without adding ungrounded diagnostic criteria, rules, or facts."
+                            ),
+                            "remediation_action": f"Remove fabricated bullet {b_idx + 1} from Slide {num} bullets."
+                        })
+
+            # Check for Bullet Count Inflation when ungrounded bullets are detected
+            if (ungrounded_bullets or audio_leakage_bullets) and len(trans_bullets) > max(1, num_raw_source_lines):
+                issues.append({
+                    "type": "BULLET_COUNT_INFLATION",
+                    "error_type": "BULLET_COUNT_INFLATION",
+                    "severity": sev,
+                    "slide_number": num,
+                    "raw_line_count": num_raw_source_lines,
+                    "bullet_count": len(trans_bullets),
+                    "message": (
+                        f"BULLET COUNT INFLATION at Slide {num}: Translated slide contains {len(trans_bullets)} bullets "
+                        f"for {num_raw_source_lines} raw presentation lines, including ungrounded/leaked bullets! "
+                        f"Track 2 slide box must maintain strict 1-to-1 fidelity with raw presentation lines."
+                    ),
+                    "remediation_action": f"Trim Slide {num} bullets to match the {num_raw_source_lines} raw presentation lines."
+                })
 
     elif not ceremonial:
         # Check for silent bypass on text slides

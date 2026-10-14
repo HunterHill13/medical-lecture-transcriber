@@ -1,42 +1,45 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.8.4): enforces Unvoiced Trailing Slide & Lecture Termination
-  Guard (rule_6 + 'HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT' gate preventing hallucinated repetition on slides after professor finishes early),
-  Continuous Global Timestamp Monotonicity Engine (rule_7 + 'CHUNK_RELATIVE_TIMESTAMP_RESET' gate preventing 00:00 timestamp regressions),
-  Word TOC Opening Section Auto-Synthesis Engine (rule_8 + 'TOC_INITIAL_SECTION_MISSING' auto-synthesizing Slide 1 section title to prevent
-  omission of opening slides from Table of Contents), Multi-Image Slice & Composite Figure Extraction Engine (extracts all substantive figures
-  into fig_paths, stitches split table/diagram images into unified composite figures, and aggregates OCR across all image slices),
-  Three-Tier Multi-Agent Parallel Orchestration & Independent QA Critic Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis
-  via deterministic 'run_pipeline.py partition' with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer,
-  and mandatory post-merge QA Critic Subagent inspection producing 'qa_audit_report.json'), Dynamic Gemini Multimodal Audio Transcription & Fallback
-  Engine (transcribes audio with latest multimodal Gemini 'gemini-flash-latest' and automatic HTTP 404/429 fallback to 'gemini-3.8-flash' and 'gemini-3.5-flash',
-  while strictly prohibiting heavyweight local Whisper/CUDA models), Universal LaTeX Math & Scientific Symbol Sanitization Engine (converts LaTeX math
-  delimiters and symbols like '$\ ge 1.0 $', '\ge', '\le', '\pm', '\times' into standard Unicode characters '≥', '≤', '±', '×', '°', 'µ' across slide
-  boxes, bullets, and table cells with zero BiDi distortion), Multi-Format Resilient Table Rendering Engine (renders both 2D raw list rows and dict
-  rows in Word with automatic column width safety and zero IndexError), Cloud-Native Exponential Backoff Audio Transcription Retry Protocol (handles
-  HTTP 429 quota exhaustion and network timeouts gracefully), PowerPoint Group Shape Unrolling Engine (iter_slide_shapes recursively expands
-  MSO_SHAPE_TYPE.GROUP so grouped diagrams and text boxes are fully preserved), Native Image Conversion Subprocess Recovery (fixes Windows System.Drawing
-  fallback for WMF/EMF/TIFF/BMP conversion), Unified Pipeline CLI Argument Forwarding (auto-forwards --img-dir and --raw across verification and build
-  stages), Slide Numerical & Statistical Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological
+  Publication-grade medical study guide and lecture transcription workflow (v5.8.5): enforces Track 2 Slide Box Strict Fidelity
+  & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
+  strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
+  Unvoiced Trailing Slide & Lecture Termination Guard (rule_6 + 'HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT' gate preventing
+  hallucinated repetition on slides after professor finishes early), Continuous Global Timestamp Monotonicity Engine (rule_7 +
+  'CHUNK_RELATIVE_TIMESTAMP_RESET' gate preventing 00:00 timestamp regressions), Word TOC Opening Section Auto-Synthesis Engine
+  (rule_8 + 'TOC_INITIAL_SECTION_MISSING' auto-synthesizing Slide 1 section title to prevent omission of opening slides from Table of Contents),
+  Multi-Image Slice & Composite Figure Extraction Engine (extracts all substantive figures into fig_paths, stitches split table/diagram images into
+  unified composite figures, and aggregates OCR across all image slices), Three-Tier Multi-Agent Parallel Orchestration & Independent QA Critic
+  Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis via deterministic 'run_pipeline.py partition'
+  with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer, and mandatory post-merge QA Critic
+  Subagent inspection producing 'qa_audit_report.json'), Dynamic Gemini Multimodal Audio Transcription & Fallback Engine (transcribes audio with
+  latest multimodal Gemini 'gemini-flash-latest' and automatic HTTP 404/429 fallback to 'gemini-3.8-flash' and 'gemini-3.5-flash', while strictly
+  prohibiting heavyweight local Whisper/CUDA models), Universal LaTeX Math & Scientific Symbol Sanitization Engine (converts LaTeX math delimiters
+  and symbols like '$\ ge 1.0 $', '\ge', '\le', '\pm', '\times' into standard Unicode characters '≥', '≤', '±', '×', '°', 'µ' across slide boxes,
+  bullets, and table cells with zero BiDi distortion), Multi-Format Resilient Table Rendering Engine (renders both 2D raw list rows and dict rows
+  in Word with automatic column width safety and zero IndexError), Cloud-Native Exponential Backoff Audio Transcription Retry Protocol (handles HTTP 429
+  quota exhaustion and network timeouts gracefully), PowerPoint Group Shape Unrolling Engine (iter_slide_shapes recursively expands MSO_SHAPE_TYPE.GROUP
+  so grouped diagrams and text boxes are fully preserved), Native Image Conversion Subprocess Recovery (fixes Windows System.Drawing fallback for
+  WMF/EMF/TIFF/BMP conversion), Unified Pipeline CLI Argument Forwarding (auto-forwards --img-dir and --raw across verification and build stages),
+  Slide Numerical & Statistical Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION strictly mandates verbatim preservation of epidemiological
   ratios like '5 in 10,000', statistical percentages like '0.5-2%', ranges, and cohort ages without qualitative generalization), Presentation Text
-  Sanitization & Encoding Recovery Engine (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF
-  extraction), Smart Visual Asset Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds;
-  extracts pure clinical diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant
-  English screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell
-  table row preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of
-  non-existent rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words;
-  UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses), Reference Note Anti-Proliferation Gate & Auto-Suppression
-  Engine (EXCESSIVE_REF_NOTE_PROLIFERATION restricts supplementary notes strictly to skipped or sparse-lecture slides <30-40 words), Universal Reference
-  Note Sanitization & Anti-Dual-Prepending Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator
-  Filtering (filters routine English prose verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine
-  (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence
-  Audit Gate (VISUAL_ASSET_AUDIT), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
-  Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 161-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Sanitization & Encoding Recovery Engine (sanitize_presentation_text normalizes \ufffd in numeric ranges, en/em dashes, and quotes in PPTX/PDF extraction),
+  Smart Visual Asset Classifier & Standalone Figure Extraction Engine (filters tiny icons, bullets, and slide master template backgrounds; extracts pure
+  clinical diagrams and prioritizes them over full-slide screenshots; enforces Smart Text Slide Screenshot Guard suppressing redundant English screenshots
+  on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION & MISSING_TABLE_DATA strictly enforce atomic cell-by-cell table row
+  preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of non-existent
+  rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION
+  blocks un-translated raw English prose clauses), Reference Note Anti-Proliferation Gate & Auto-Suppression Engine (EXCESSIVE_REF_NOTE_PROLIFERATION
+  restricts supplementary notes strictly to skipped or sparse-lecture slides <30-40 words), Universal Reference Note Sanitization & Anti-Dual-Prepending
+  Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator Filtering (filters routine English prose
+  verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG
+  for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Track 3
+  Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping (validates
+  line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases), Visual-Aware OCR Triggering, Automated 164-Test Suite in tests/,
+  and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.8.4)
+# Medical Lecture Transcriber & Study Guide Generator (v5.8.5)
 
 ## Overview
 
@@ -712,6 +715,12 @@ uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations 
    - در صورتی که اسلایدهای ۱ تا M فاقد تگ `section_title` باشند ولی اسلاید $M+1$ دارای عنوان بخش باشد:
    - سیستم و کامپایلر فایل Word به طور خودکار برای اسلاید ۱ عنوان بخش آغازین (`intro_title`) از روی `title_fa` اسلاید ۱ سنتز می‌کند.
    - این امر تضمین می‌کند که اسلایدهای ۱ تا M هرگز از جدول فهرست مطالب (`TOC`) جا نیفتند و سطر اول فهرست مطالب به صورت استاندارد محدوده `اسلایدهای ۱ الی M` را پوشش دهد.
+
+4. **پروتکل وفاداری قطعی کادر اسلاید و مقابله با نشت صوت و توهم حافظه پارامتریک (`rule_9` + `AUDIO_LEAKAGE_INTO_SLIDE_BOX` + `PARAMETRIC_BULLET_FABRICATION` + `BULLET_COUNT_INFLATION` — v5.8.5):**
+   - **تفکیک مطلق ریل‌ها (Strict Track Isolation):** بالت‌های کادر اسلاید (`bullets` در Track 2) باید آینه ۱۰۰٪ کلمه‌به‌کلمه و وفادار به خطوط متن انگلیسی اسلاید خام (`text_lines`) باشند.
+   - **ممنوعیت نشت صوت استاد به بالت‌های اسلاید:** ساب‌ایجنت‌ها حق ندارند توضیحات شفاهی استاد سر کلاس را وارد بالت‌های اسلاید کنند. توضیحات شفاهی منحصراً متعلق به Track 1 (`spoken_lecture`) است.
+   - **ممنوعیت توهم حافظه پارامتریک:** در اسلایدهای کوتاه با ۱ الی ۲ سطر، ساب‌ایجنت‌ها حق ندارند از حافظه پزشکی خود (هاریسون/آپ‌تودیت) بالت‌های اضافی حاوی معیارها، بازه‌های زمانی یا درصدهای ناموجود در اسلاید بسازند.
+   - **گیت اعتبارسنجی تک‌به‌تک بالت‌ها:** گیت خودکار `verify_slide_alignment.py` هر بالت را به صورت مجزا ارزیابی کرده و در صورت کشف بالت بدون رفرنس در اسلاید خام، خطای سخت `AUDIO_LEAKAGE_INTO_SLIDE_BOX` یا `PARAMETRIC_BULLET_FABRICATION` صادر نموده و تورم تعداد بالت‌ها را با `BULLET_COUNT_INFLATION` متوقف می‌سازد.
 
 ---
 

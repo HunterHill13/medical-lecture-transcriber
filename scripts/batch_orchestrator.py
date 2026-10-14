@@ -341,6 +341,12 @@ def partition_slides(
                     "Ensure Slide 1 has a descriptive 'section_title' (e.g. 'مقدمه و کلیات مبحث' or the main lecture title) so that the Table of Contents "
                     "(TOC) covers the opening section from Slide 1."
                 ),
+                "rule_9_slide_box_strict_fidelity_and_anti_enrichment": (
+                    "Track 2 ('bullets' in Slide Box) MUST be a strict, faithful 1-to-1 mirror translation of the raw slide's English text lines. "
+                    "NEVER import or leak verbal explanations spoken by the professor into slide bullets (spoken explanations belong strictly to Track 1 'spoken_lecture'). "
+                    "NEVER use external/parametric medical memory (Harrison, UpToDate) to fabricate or expand bullets that do not exist on the slide. "
+                    "The number and semantics of bullets must strictly correspond to the raw slide's lines."
+                ),
             },
             "halo_prev": halo_prev,
             "slides": target_slice,
