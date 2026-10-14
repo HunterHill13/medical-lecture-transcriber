@@ -326,6 +326,21 @@ def partition_slides(
                     "'ref_note' is strictly reserved for slides where the professor gave NO explanation or very brief/sparse explanation (< 30-40 words), or skipped the slide entirely ('is_skipped': true). "
                     "If the professor gave a full, comprehensive explanation, you MUST leave 'ref_note': \"\" (empty string). Do NOT add supplementary reference notes indiscriminately."
                 ),
+                "rule_6_lecture_termination_and_unvoiced_trailing_slides": (
+                    "If the professor concludes the lecture early (e.g. says goodbye, concludes session, states 'این آخرین اسلایدم هستش') at slide K, "
+                    "or explicitly omits trailing slides, you MUST NOT hallucinate, repeat, or displace earlier lecture audio into slides K+1..N. "
+                    "All trailing unvoiced slides MUST have 'is_skipped': true (or 'unvoiced': true), 'spoken_lecture': \"\", and a mandatory "
+                    "substantive 'ref_note' (15-30 words) explaining the slide's clinical concepts from the textbook."
+                ),
+                "rule_7_continuous_global_timestamps": (
+                    "Timestamps ('audio_time', 'audio_time_range') MUST ALWAYS be continuous global presentation timestamps relative to the start of "
+                    "the full lecture (e.g. 18:20 - 21:45). NEVER use chunk-relative timestamps resetting to 00:00! If working from an audio chunk "
+                    "(e.g. chunk 3 starting at 15:00), add the chunk's start offset to each timestamp so timestamps monotonically advance across all batches."
+                ),
+                "rule_8_section_title_on_slide_one": (
+                    "Ensure Slide 1 has a descriptive 'section_title' (e.g. 'مقدمه و کلیات مبحث' or the main lecture title) so that the Table of Contents "
+                    "(TOC) covers the opening section from Slide 1."
+                ),
             },
             "halo_prev": halo_prev,
             "slides": target_slice,
@@ -529,6 +544,17 @@ def merge_slide_batches(
 
     merged_slides_sorted = [merged_by_num[n] for n in sorted(merged_by_num.keys())]
 
+    # Auto-synthesize Slide 1 section_title if later slides define sections but Slide 1 lacks it
+    if merged_slides_sorted and any(bool(s.get("section_title")) for s in merged_slides_sorted) and not merged_slides_sorted[0].get("section_title"):
+        intro_title = merged_slides_sorted[0].get("title_fa") or "مقدمه و کلیات مبحث"
+        merged_slides_sorted[0]["section_title"] = intro_title
+        warnings.append({
+            "code": "TOC_INITIAL_SLIDES_COVERAGE_SYNTHESIZED",
+            "slide_number": merged_slides_sorted[0].get("slide_number", 1),
+            "synthesized_section_title": intro_title,
+            "message": f"Slide 1 lacked 'section_title' while later slides defined sections. Auto-synthesized '{intro_title}' to ensure opening slides 1..M are covered in TOC."
+        })
+
     # Cross-batch boundary & parent_lecture_slide resolution
     for s_obj in merged_slides_sorted:
         s_num = int(s_obj["slide_number"])
@@ -592,6 +618,66 @@ def merge_slide_batches(
                         f"(end of batch {i+1}); linked parent_lecture_slide={root_parent} to prevent duplicate rendering."
                     ),
                 })
+
+    # Check for chunk-relative timestamp resets (e.g. 00:00 on slide 25)
+    from text_utils import extract_timestamps, format_seconds_to_time
+    max_time_sec = 0
+    for s_obj in merged_slides_sorted:
+        s_num = int(s_obj.get("slide_number", 0))
+        time_str = s_obj.get("audio_time_range") or s_obj.get("audio_time")
+        if time_str:
+            ts_list = extract_timestamps(str(time_str))
+            if ts_list:
+                s_st = ts_list[0]
+                has_xref = bool(s_obj.get("cross_references"))
+                if s_num >= 5 and s_st < 180 and max_time_sec >= 480 and not has_xref:
+                    warnings.append({
+                        "code": "CHUNK_RELATIVE_TIMESTAMP_RESET",
+                        "slide_number": s_num,
+                        "timestamp": str(time_str),
+                        "max_preceding_time": format_seconds_to_time(max_time_sec),
+                        "message": (
+                            f"Slide {s_num} timestamp ('{time_str}') resets to near 00:00 while preceding slides reached "
+                            f"{format_seconds_to_time(max_time_sec)}. Likely chunk-relative timing. Convert to global continuous time."
+                        )
+                    })
+                max_time_sec = max(max_time_sec, s_st)
+
+    # Detect lecture termination and hallucinated trailing lecture displacement
+    termination_phrases = ["خسته نباشید", "پایان جلسه", "آخرین اسلاید", "آخرین اسلایدم", "موفق باشید", "خداحافظ", "اتمام درس", "اتمام این جلسه"]
+    term_slide_num = None
+    for s_obj in merged_slides_sorted:
+        spk = s_obj.get("spoken_lecture", "") or ""
+        if any(tp in spk for tp in termination_phrases):
+            term_slide_num = int(s_obj.get("slide_number", 0))
+            break
+
+    if term_slide_num is not None:
+        earlier_lectures = {}
+        for s_obj in merged_slides_sorted:
+            s_num = int(s_obj.get("slide_number", 0))
+            if s_num < term_slide_num:
+                spk = (s_obj.get("spoken_lecture") or "").strip()
+                if len(spk) >= 30:
+                    earlier_lectures[s_num] = spk
+
+        for s_obj in merged_slides_sorted:
+            s_num = int(s_obj.get("slide_number", 0))
+            if s_num > term_slide_num:
+                spk = (s_obj.get("spoken_lecture") or "").strip()
+                if spk:
+                    for prev_n, prev_spk in earlier_lectures.items():
+                        if spk == prev_spk or (len(spk) > 40 and spk in prev_spk) or (len(prev_spk) > 40 and prev_spk in spk):
+                            errors.append({
+                                "code": "HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT",
+                                "slide_number": s_num,
+                                "source_slide": prev_n,
+                                "message": (
+                                    f"Slide {s_num} occurs after lecture termination at Slide {term_slide_num}, but hallucinates/copies "
+                                    f"earlier spoken lecture from Slide {prev_n}! Unvoiced trailing slides must have 'is_skipped': true and 'spoken_lecture': \"\"."
+                                )
+                            })
+                            break
 
     status = "PASSED" if not errors else "FAILED"
     report = {

@@ -166,7 +166,7 @@ wheels = [
 
 [[package]]
 name = "medical-lecture-transcriber"
-version = "5.8.3"
+version = "5.8.4"
 source = { editable = "." }
 dependencies = [
     { name = "pymupdf" },

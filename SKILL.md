@@ -1,8 +1,12 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.8.3): enforces Multi-Image Slice & Composite Figure Extraction
-  Engine (extracts all substantive figures into fig_paths, stitches split table/diagram images into unified composite figures, and aggregates OCR across all image slices),
+  Publication-grade medical study guide and lecture transcription workflow (v5.8.4): enforces Unvoiced Trailing Slide & Lecture Termination
+  Guard (rule_6 + 'HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT' gate preventing hallucinated repetition on slides after professor finishes early),
+  Continuous Global Timestamp Monotonicity Engine (rule_7 + 'CHUNK_RELATIVE_TIMESTAMP_RESET' gate preventing 00:00 timestamp regressions),
+  Word TOC Opening Section Auto-Synthesis Engine (rule_8 + 'TOC_INITIAL_SECTION_MISSING' auto-synthesizing Slide 1 section title to prevent
+  omission of opening slides from Table of Contents), Multi-Image Slice & Composite Figure Extraction Engine (extracts all substantive figures
+  into fig_paths, stitches split table/diagram images into unified composite figures, and aggregates OCR across all image slices),
   Three-Tier Multi-Agent Parallel Orchestration & Independent QA Critic Subagent Engine (parallelizes audio chunk transcription, 10-12 slide batch translation/synthesis
   via deterministic 'run_pipeline.py partition' with 1-slide read-only Context Halo and isolated 'batches/' shards, boundary-safe 'merge-batches' reducer,
   and mandatory post-merge QA Critic Subagent inspection producing 'qa_audit_report.json'), Dynamic Gemini Multimodal Audio Transcription & Fallback
@@ -29,10 +33,10 @@ description: >-
   (converts WMF, EMF, SVG, WebP, TIFF to PNG for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence
   Audit Gate (VISUAL_ASSET_AUDIT), Track 3 Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box),
   Semantic Source Provenance Mapping (validates line citations), Unified Bilingual Medical Concept Engine (265+ concepts & phrases),
-  Visual-Aware OCR Triggering, Automated 156-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
+  Visual-Aware OCR Triggering, Automated 161-Test Suite in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.8.3)
+# Medical Lecture Transcriber & Study Guide Generator (v5.8.4)
 
 ## Overview
 
@@ -689,6 +693,25 @@ uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations 
    - **ممنوعیت نشست محتوای اسلاید به ویس (Anti-Track Leakage):** حتی اگر استاد در فایل صوتی (Track 1) این اعداد و نسبت‌ها را با شرح کامل توضیح داده باشد، کادر ترجمه اسلاید (Track 2) موظف است تمامی ارقام و داده‌های آماری اسلاید را عیناً و با وفاداری کامل به فارسی ترجمه و ثبت کند.
    - **پالایش خودکار انکودینگ و کاراکترهای خراب (`sanitize_presentation_text`):** سیستم در دو لایه استخراج و ارزیابی، خرابی‌های ناشی از فونت‌های قدیمی و تبدیل انکودینگ (نظیر `\ufffd` در بازه‌ها مانند `2\ufffd5%` به `2-5%`، خط تیره‌های یونیکد en-dash و em-dash و گیومه‌های فانتزی) را به صورت خودکار پالایش و استانداردسازی می‌کند.
    - **صدور خطای سخت مسدودکننده:** چنانچه هرگونه نسبت آماری، درصد، بازه عددی یا دوز دارویی از اسلاید اصلی در ترجمه بولت‌ها یا جدول حذف شود، گیت `verify_slide_alignment.py` بلافاصله خطای سخت `SLIDE_NUMERICAL_DATA_OMISSION` صادر کرده و مانع از ساخت جزوه ناقص می‌گردد.
+
+### V. Lecture Termination, Monotonic Global Timestamps & Word TOC Opening Fallback Protocol (پروتکل‌های پایان تدریس کلاسی، زمان‌بندی پیوسته و پوشش کامل فهرست مطالب — v5.8.4)
+
+1. **ریشه‌یابی پایان زودهنگام تدریس کلاسی و خطای توهم جابجایی (Root Cause: Early Lecture Termination & Hallucinated Displacement):**
+   - در برخی جلسات، استاد تدریس کلاسی را زودتر از اسلاید آخر فایل ارائه به پایان می‌رساند (مثلاً در اسلاید ۹۴ از ۱۲۰ اسلاید، با گفتن: «این الگوریتم، آخرین اسلایدم هستش... خیلی خب بچه‌ها این الگوریتمو دقت کنیم... و برای همه آرزوی موفقیت دارم و خسته نباشید»).
+   - **خطای فاجعه‌بار جابجایی توهمی (Displaced Lecture Hallucination):** اگر ساب‌ایجنت‌ها ندانند تدریس تمام شده است، احساس اجبار می‌کنند که برای اسلایدهای ۹۵ تا ۱۲۰ فیلد `spoken_lecture` را پر کنند؛ در نتیجه شروع به کپی‌پیست سخنان ۴۰ دقیقه قبل استاد روی اسلایدهای انتهایی می‌کنند یا پیام خداحافظی استاد را به جای اسلاید ۹۴ به اسلاید ۱۲۰ می‌چسبانند در حالی که اسلایدهای میانی خالی رها شده‌اند!
+   - **محافظ قطعی اسلایدهای تدریس‌نشده انتهایی (`rule_6` + `HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT`):**
+     - در صورتی که استاد در اسلاید K تدریس را خاتمه داد یا اسلایدهای بعدی را ناگفته رها کرد، تمام اسلایدهای $K+1 \dots N$ **باید** با `"is_skipped": true`، `"spoken_lecture": ""` و فیلد اجباری `"ref_note"` (۱۵ تا ۳۰ کلمه توضیح دقیق بالینی از کتاب رفرنس) نشانه‌گذاری شوند.
+     - هرگونه تکرار محتوای صوتی اسلایدهای قبلی روی اسلایدهای بعد از اسلاید پایان، توسط گیت‌های `verify_slide_alignment.py` و `merge-batches` با خطای `HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT` شناسایی و متوقف می‌گردد.
+
+2. **پروتکل زمان‌بندی پیوسته جهانی و محافظ ریست زمان محلی (`rule_7` + `CHUNK_RELATIVE_TIMESTAMP_RESET`):**
+   - تمامی زمان‌های صوتی درج‌شده در جزوه (`audio_time` و `audio_time_range`) باید منحصراً زمان‌های مطلق و پیوسته نسبت به ابتدای فایل صوتی جلسه کلاسی باشند (مانند `18:20 - 21:45`).
+   - درج زمان‌های محلی چانک‌های خردشده (مانند شروع از `00:00` یا `01:17` در اسلاید ۲۵ یا ۶۹) اکیداً ممنوع است.
+   - گیت اعتبارسنجی هرگونه پسرفت غیرمنطقی زمان به سمت کمتر از ۳ دقیقه در اسلایدهای شماره ۵ به بعد را با هشدار `CHUNK_RELATIVE_TIMESTAMP_RESET` پرچم‌گذاری می‌کند و مدل را ملزم به اضافه کردن افست شروع چانک به زمان اسلاید می‌نماید.
+
+3. **موتور خودکارسازی بخش آغازین فهرست مطالب Word (`rule_8` + `TOC_INITIAL_SECTION_MISSING`):**
+   - در صورتی که اسلایدهای ۱ تا M فاقد تگ `section_title` باشند ولی اسلاید $M+1$ دارای عنوان بخش باشد:
+   - سیستم و کامپایلر فایل Word به طور خودکار برای اسلاید ۱ عنوان بخش آغازین (`intro_title`) از روی `title_fa` اسلاید ۱ سنتز می‌کند.
+   - این امر تضمین می‌کند که اسلایدهای ۱ تا M هرگز از جدول فهرست مطالب (`TOC`) جا نیفتند و سطر اول فهرست مطالب به صورت استاندارد محدوده `اسلایدهای ۱ الی M` را پوشش دهد.
 
 ---
 

@@ -1081,7 +1081,8 @@ def test_extract_pptx_multiple_images_extracts_all_and_ocrs_all(monkeypatch):
         ocr_calls = []
         def fake_ocr(img_path):
             ocr_calls.append(img_path)
-            if "fig" in img_path and ("2" in img_path or "02" in img_path):
+            fname = os.path.basename(img_path)
+            if "fig" in fname and ("2" in fname or "02" in fname):
                 return ["Lactic acidosis risk", "Contraindication: eGFR < 30"], 0.90, True, False
             else:
                 return ["Metformin mechanism: AMPK activation", "Advantages: weight neutral"], 0.92, True, False

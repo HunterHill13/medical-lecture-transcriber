@@ -1432,6 +1432,89 @@ def main():
                 "remediation_action": "Run 'run_pipeline.py partition --batch-size 12' and launch parallel Slide-Batch Worker subagents via invoke_subagent."
             })
 
+    # Check 5.1: Initial TOC Section Check
+    if any(s.get("section_title") for s in trans_list) and not trans_list[0].get("section_title"):
+        warn_msg = (
+            "TOC_INITIAL_SECTION_MISSING: Slide 1 lacks 'section_title' while later slides have section titles. "
+            "Word pamphlet compiler will automatically synthesize an introductory section title to prevent omitting opening slides from TOC."
+        )
+        warnings.append(warn_msg)
+        diagnostics["warnings"].append({
+            "warning_type": "TOC_INITIAL_SECTION_MISSING",
+            "message": warn_msg,
+            "remediation_action": "Provide 'section_title' for Slide 1 or allow auto-synthesis by Word compiler."
+        })
+
+    # Check 5.2: Timestamp Monotonicity and Chunk-Relative Reset Audit
+    from text_utils import extract_timestamps, format_seconds_to_time
+    max_prev_sec = 0
+    for num in range(1, total_slides + 1):
+        t_item = trans_db.get(num, {})
+        t_str = t_item.get("audio_time_range") or t_item.get("audio_time")
+        if t_str:
+            times = extract_timestamps(str(t_str))
+            if times:
+                st_sec = times[0]
+                has_xref = bool(t_item.get("cross_references"))
+                if num >= 5 and st_sec < 180 and max_prev_sec >= 480 and not has_xref:
+                    warn_msg = (
+                        f"CHUNK_RELATIVE_TIMESTAMP_RESET at Slide {num}: Timestamp ('{t_str}') resets to near 00:00 "
+                        f"while preceding slides reached {format_seconds_to_time(max_prev_sec)}. "
+                        "Subagents must calculate global continuous lecture timestamps instead of chunk-relative times."
+                    )
+                    warnings.append(warn_msg)
+                    diagnostics["warnings"].append({
+                        "warning_type": "CHUNK_RELATIVE_TIMESTAMP_RESET",
+                        "error_type": "CHUNK_RELATIVE_TIMESTAMP_RESET",
+                        "slide_number": num,
+                        "timestamp": str(t_str),
+                        "max_preceding_time": format_seconds_to_time(max_prev_sec),
+                        "message": warn_msg,
+                        "remediation_action": f"Convert Slide {num} timestamp to global lecture time by adding the chunk start offset."
+                    })
+                max_prev_sec = max(max_prev_sec, st_sec)
+
+    # Check 5.3: Lecture Termination & Hallucinated Trailing Lecture Displacement Audit
+    term_phrases = ["خسته نباشید", "پایان جلسه", "آخرین اسلاید", "آخرین اسلایدم", "موفق باشید", "خداحافظ", "اتمام درس", "اتمام این جلسه"]
+    termination_slide = None
+    for num in range(1, total_slides + 1):
+        t_item = trans_db.get(num, {})
+        spk = t_item.get("spoken_lecture", "") or ""
+        if any(tp in spk for tp in term_phrases):
+            termination_slide = num
+            break
+
+    if termination_slide is not None:
+        earlier_lectures = {}
+        for num in range(1, termination_slide):
+            t_item = trans_db.get(num, {})
+            spk = (t_item.get("spoken_lecture") or "").strip()
+            if len(spk) >= 30:
+                earlier_lectures[num] = spk
+
+        for num in range(termination_slide + 1, total_slides + 1):
+            t_item = trans_db.get(num, {})
+            spk = (t_item.get("spoken_lecture") or "").strip()
+            if spk:
+                for prev_n, prev_spk in earlier_lectures.items():
+                    if spk == prev_spk or (len(spk) > 40 and spk in prev_spk) or (len(prev_spk) > 40 and prev_spk in spk):
+                        err_msg = (
+                            f"HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT at Slide {num}: Lecture terminated at Slide {termination_slide}, "
+                            f"but Slide {num} hallucinates/repeats spoken lecture from Slide {prev_n}! "
+                            "Trailing slides after lecture completion must have 'is_skipped': true, 'spoken_lecture': \"\", and mandatory 'ref_note'."
+                        )
+                        warnings.append(err_msg)
+                        diagnostics["warnings"].append({
+                            "warning_type": "HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT",
+                            "error_type": "HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT",
+                            "severity": "warning",
+                            "slide_number": num,
+                            "source_slide": prev_n,
+                            "message": err_msg,
+                            "remediation_action": f"Set 'is_skipped': true, 'spoken_lecture': \"\", and provide 'ref_note' for unvoiced Slide {num}."
+                        })
+                        break
+
     print("-" * 65)
     if warnings:
         print(f"⚠️  {len(warnings)} Advisory Warnings:")

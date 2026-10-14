@@ -1005,6 +1005,10 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
     add_title(doc, title)
     
     # 1. Build Dynamic Table of Contents (TOC) if section_titles exist
+    if slides and any(bool(s.get("section_title")) for s in slides) and not slides[0].get("section_title"):
+        intro_title = slides[0].get("title_fa") or title or "مقدمه و کلیات مبحث"
+        slides[0]["section_title"] = intro_title
+
     toc_rows = []
     sec_idx = 1
     for i, s in enumerate(slides):
