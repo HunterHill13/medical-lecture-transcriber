@@ -165,3 +165,83 @@ def test_table_recall_threshold_blocks_half_omitted_clinical_tables():
     incomplete_errs = [i for i in issues if i.get("type") == "INCOMPLETE_TABLE_TRANSCRIPTION"]
     assert len(incomplete_errs) >= 1, f"Expected INCOMPLETE_TABLE_TRANSCRIPTION for half-omitted table, got: {issues}"
     assert incomplete_errs[0]["severity"] == "error"
+
+
+def test_add_bidi_text_preserves_newlines_as_line_breaks():
+    """
+    Regression Test:
+    add_bidi_text must preserve explicit newlines (\n) as Word line breaks (<w:br/>)
+    rather than squashing multi-line bullet points or cell entries into spaces.
+    """
+    doc = docx.Document()
+    p = doc.add_paragraph()
+    add_bidi_text(p, "• سطر اول\n• سطر دوم\n• سطر سوم")
+
+    # Verify that <w:br/> is present in the paragraph runs
+    br_elements = p._p.xpath('.//w:br')
+    assert len(br_elements) == 2, f"Expected 2 <w:br/> line breaks for 3-line text, found {len(br_elements)}"
+    
+    # Verify that text is not flattened with space into a single run
+    all_text = "".join(p._p.xpath('.//w:t/text()'))
+    assert "سطر اول" in all_text and "سطر دوم" in all_text and "سطر سوم" in all_text
+
+
+def test_slide_box_title_renders_only_persian():
+    """
+    Regression Test:
+    Slide box header must ONLY render Persian title (title_fa) to keep it concise,
+    and must NOT append English title (title_en) in parentheses.
+    """
+    from create_slide_pamphlet import add_slide_box_from_json
+    doc = docx.Document()
+    slide_data = {
+        "slide_number": 19,
+        "title_fa": "اتیولوژی و طبقه‌بندی دیابت بی‌مزه",
+        "title_en": "Etiology and Classification of Diabetes Insipidus",
+        "bullets": ["نکته تستی"]
+    }
+    add_slide_box_from_json(doc, slide_data)
+    
+    # Find table created for slide box
+    tbl = doc.tables[0]
+    header_cell = tbl.cell(0, 0)
+    header_text = header_cell.text
+    
+    # Must contain title_fa
+    assert "اتیولوژی و طبقه‌بندی دیابت بی‌مزه" in header_text
+    # Must NOT contain title_en
+    assert "Etiology and Classification" not in header_text, f"Found English title in header: '{header_text}'"
+    assert "Diabetes Insipidus" not in header_text, f"Found English title in header: '{header_text}'"
+
+
+def test_render_reference_table_with_banner_and_multiline_cells():
+    """
+    Regression Test:
+    render_reference_table must support hierarchical tables with banner rows ({"type": "banner", "text": "..."})
+    and multi-line cell entries with <w:br/>.
+    """
+    from create_slide_pamphlet import render_reference_table
+    doc = docx.Document()
+    tbl_container = doc.add_table(rows=1, cols=1)
+    cell = tbl_container.cell(0, 0)
+    
+    headers = ["اتیولوژی", "ویژگی‌های بالینی"]
+    items = [
+        {"type": "banner", "text": "۱. کمبود اولیه وازوپرسین (دیابت بی‌مزه سنترال)"},
+        {"cols": ["ترومای سر و جراحی", "• شروع حاد پلی‌اوری\n• پاسخ کامل به دسموپرسین"]}
+    ]
+    render_reference_table(cell, headers, items)
+    
+    # Check inner table created in cell
+    inner_tbl = cell.tables[0]
+    assert len(inner_tbl.rows) == 3  # Header + Banner + Data row
+    
+    # Check banner row text
+    banner_cell = inner_tbl.cell(1, 0)
+    assert "کمبود اولیه وازوپرسین" in banner_cell.text
+    
+    # Check multiline cell has <w:br/>
+    data_cell = inner_tbl.cell(2, 1)
+    brs = data_cell._tc.xpath('.//w:br')
+    assert len(brs) >= 1, f"Expected <w:br/> in multiline cell, found {len(brs)}"
+

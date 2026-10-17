@@ -1,9 +1,11 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.8.6): enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.8.7): enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
+  Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
+  Hierarchical Reference Table Banner Engine (supports 'type: banner' full-width merged rows and multiline '\n' bullet preservation in Word table cells),
   Unvoiced Trailing Slide & Lecture Termination Guard (rule_6 + 'HALLUCINATED_TRAILING_LECTURE_DISPLACEMENT' gate preventing
   hallucinated repetition on slides after professor finishes early), Continuous Global Timestamp Monotonicity Engine (rule_7 +
   'CHUNK_RELATIVE_TIMESTAMP_RESET' gate preventing 00:00 timestamp regressions), Word TOC Opening Section Auto-Synthesis Engine
@@ -36,11 +38,11 @@ description: >-
   verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG
   for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Track 3
   Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping (validates
-  line citations), Unified Bilingual Medical Concept Engine (280+ clinical concepts & phrases), Visual-Aware OCR Triggering, Automated 170-Test Suite
+  line citations), Unified Bilingual Medical Concept Engine (280+ clinical concepts & phrases), Visual-Aware OCR Triggering, Automated 173-Test Suite
   in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.8.6)
+# Medical Lecture Transcriber & Study Guide Generator (v5.8.7)
 
 ## Overview
 
@@ -501,12 +503,17 @@ uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations 
        ```
        این دستور فایل `raw_slides.json` را به دسته‌های ۱۲ اسلایدی مجزا (`batches/batch_01_12_raw.json`، `batches/batch_13_24_raw.json` و...) تقسیم کرده و به هر دسته **۱ اسلاید هاله متنی فقط-خواندنی** قبل و بعد (`halo_prev` و `halo_next`) و لیست دقیق اسلایدهای نیازمند بینایی ماشین (`mandatory_vision_slides`) و اسلایدهای دارای جدول (`mandatory_table_slides`) را الصاق می‌کند.
      - **گام ب (`invoke_subagent` موازی برای تمام دسته‌ها هم‌زمان):** ایجنت اصلی در **یک فراخوانی واحد `invoke_subagent`**، به ازای هر دسته در `batches_manifest.json` یک ساب‌ایجنت موازی (`TypeName="self"`, `Model="inherit"`) با نقش `Slide Batch Worker [Start..End]` فراخوانی می‌کند.
-     - **۵ قانون آهنین ایزوله‌سازی ساب‌ایجنت‌های نگارش اسلاید:**
+     - **۶ قانون آهنین ایزوله‌سازی ساب‌ایجنت‌های نگارش اسلاید:**
        1. **منع مطلق نوشتن مستقیم در `translated_slides.json` (Zero Shared-File Contention):** هر ساب‌ایجنت منحصراً مجاز است در فایل شارد اختصاصی خود (`batches/translated_batch_XX_YY.json`) بنویسد.
        2. **ثبات مطلق شماره اسلایدها (`expected_slide_numbers`):** ساب‌ایجنت باید دقیقاً همان شماره اسلایدهای موجود در `expected_slide_numbers` را بدون جا انداختن یا تغییر شماره تولید کند. اسلایدهای `halo_prev` و `halo_next` صرفاً برای آگاهی از ادامه یافتن خوشه‌های تدریس (`parent_lecture_slide`) در مرز دسته‌ها هستند و نباید در خروجی شارد نوشته شوند (و حتی اگر سهواً نوشته شوند، دستور `merge-batches` آن‌ها را خودکار حذف می‌کند).
        3. **اجبار فراخوانی `view_file` روی تصاویر اسلایدهای بصری و جدولی دسته:** هر ساب‌ایجنت موظف است روی تمام تصاویر اسلایدهای درج‌شده در `mandatory_vision_slides` و `mandatory_table_slides` ابزار `view_file` را فراخوانی کند.
        4. **فرمت اجباری جداول (`table_data`):** برای هر اسلایدی که در `mandatory_table_slides` قرار دارد (یا در تصویر آن جدول دیده می‌شود)، ساب‌ایجنت **موظف** است ساختار کامل جدول را در فیلد `"table_data": {"headers": [...], "rows": [...]}` به صورت سلول‌به‌سلول و بدون خلاصه‌سازی وارد کند (تبدیل جداول به بالت‌های متنی ساده اکیداً ممنوع است).
+          - **پشتیبانی کامل از جداول رفرنس سلسله‌مراتبی (Hierarchical Banner Rows):** در جداول رفرنس بزرگ (نظیر جدول طبقه‌بندی دیابت بی‌مزه در هاریسون)، دسته‌بندی‌های اصلی را درون سلول‌های عادی نچپانید. برای هر سرشاخه اصلی از سطر بنر تمام‌عرض استفاده کنید:
+            `{"type": "banner", "text": "۱. کمبود اولیه وازوپرسین (دیابت بی‌مزه مرکزی / سنترال)"}`
+            موتور رندر Word این سطرها را با ادغام کامل تمام ستون‌ها و پس‌زمینه متمایز سرمه‌ای نمایش می‌دهد.
+          - **بالت‌های چندخطی تمیز درون سلول‌ها با اینتر (`\n`):** برای نمایش خوانا و منظم چند علت، دارو یا ژن درون یک سلول جدول، آن‌ها را با `\n• ...` از هم تفکیک کنید. موتور رندر اینترها را به شکستگی نرم (`<w:br/>`) تبدیل کرده و در خروجی Word به زیبایی چندخطی نمایش می‌دهد.
        5. **منع نمادهای لاتک:** استفاده از یونیکد مستقیم (`≥`, `≤`, `±`, `×`, `°`, `µ`, `→`) الزامی و استفاده از `$ ... $` یا `\ge` ممنوع است.
+       6. **عنوان کادر اسلایدها (Persian-Only Slide Box Title):** تیتر کادر اسلایدها در سند Word صرفاً با عنوان فارسی (`title_fa`) رندر می‌شود تا تیترها کوتاه، رسا و خلوت باشند. فیلد انگلیسی `title_en` کماکان در ساختار JSON جهت قابلیت سرچ متادیتا حفظ می‌شود اما در تیتر کادر مایکروسافت ورد تکرار نمی‌گردد.
      - **گام ج (`merge-batches`):** پس از اتمام کار تمام ساب‌ایجنت‌های دسته، ایجنت اصلی دستور زیر را اجرا می‌کند:
        ```powershell
        uv run python scripts/run_pipeline.py merge-batches --ref-book هاریسون

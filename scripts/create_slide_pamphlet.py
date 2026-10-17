@@ -255,17 +255,12 @@ def add_r(p, text, font_name="Dubai", size_pt=11, bold=False, italic=False, colo
             
     return run
 
-def add_bidi_text(p, text, font_name="Dubai", size_pt=10.5, bold=False, italic=False, color_rgb=(0x26, 0x26, 0x26)):
-    """
-    Renders mixed Persian/English scientific text with strict BiDi isolation.
-    Preserves arrows (→, ⇌, <->, ->), chemical formulas (Ca²⁺, HCO₃⁻), inequalities (p < 0.05, ≥ 1.0, ≤ 0.5),
-    and Latin abbreviations without converting scientific symbols to Persian prose.
-    """
-    if not text:
+def _render_bidi_line(p, text_line, font_name="Dubai", size_pt=10.5, bold=False, italic=False, color_rgb=(0x26, 0x26, 0x26)):
+    """Renders a single line of mixed Persian/English text with BiDi run isolation."""
+    if not text_line:
         return
-    text = sanitize_latex_math(str(text)).replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
-    if not any('\u0600' <= c <= '\u06FF' for c in text):
-        add_r(p, text, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
+    if not any('\u0600' <= c <= '\u06FF' for c in text_line):
+        add_r(p, text_line, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
         return
     sci_chars = r'A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻⁰¹⁴⁵⁶⁷⁸⁹⁼⁽⁾ⁿ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎'
     pattern = (
@@ -279,7 +274,7 @@ def add_bidi_text(p, text, font_name="Dubai", size_pt=10.5, bold=False, italic=F
         rf'|[{sci_chars}]{{2,}}'
         rf'|[→⇌⇄≥≤≈≠×°µ·])'
     )
-    tokens = re.split(pattern, text)
+    tokens = re.split(pattern, text_line)
     for tok in tokens:
         if not tok:
             continue
@@ -292,6 +287,24 @@ def add_bidi_text(p, text, font_name="Dubai", size_pt=10.5, bold=False, italic=F
             add_r(p, " " + tok.strip() + " ", font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
         else:
             add_r(p, tok, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=True)
+
+def add_bidi_text(p, text, font_name="Dubai", size_pt=10.5, bold=False, italic=False, color_rgb=(0x26, 0x26, 0x26)):
+    """
+    Renders mixed Persian/English scientific text with strict BiDi isolation.
+    Preserves explicit newlines as Word line breaks (<w:br/>) for clean multi-line
+    bulleted items within table cells and callouts.
+    Preserves arrows (→, ⇌, <->, ->), chemical formulas (Ca²⁺, HCO₃⁻), inequalities (p < 0.05, ≥ 1.0, ≤ 0.5),
+    and Latin abbreviations without converting scientific symbols to Persian prose.
+    """
+    if not text:
+        return
+    text = sanitize_latex_math(str(text))
+    lines = text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+    for l_idx, line in enumerate(lines):
+        if l_idx > 0:
+            br_run = p.add_run()
+            br_run.add_break()
+        _render_bidi_line(p, line, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb)
 
 def add_formatted_bidi_text(p, text_or_runs, font_name="Dubai", size_pt=10.5, default_bold=False, default_italic=False, color_rgb=(0x26, 0x26, 0x26)):
     """
@@ -715,8 +728,6 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     prefix_label = "📑 اسلاید مقدماتی " if is_ceremonial else "📑 اسلاید مرتبط "
     add_r(p0, f"{prefix_label}{slide_num}: ", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x1B, 0x4F, 0x72))
     add_r(p0, title_fa, font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
-    if title_en:
-        add_r(p0, f" ({title_en})", font_name="Dubai", size_pt=9.5, italic=True, color_rgb=(0x55, 0x55, 0x55), is_rtl=False)
     if is_ceremonial:
         add_r(p0, " [اسلاید تشریفاتی / مقدماتی]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0x2E, 0x86, 0xC1))
     elif is_skipped:
