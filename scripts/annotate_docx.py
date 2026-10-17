@@ -119,9 +119,15 @@ def extract_page_number(text):
     Matches 'Page_1', 'Page 1', 'اسلاید 1', 'اسلاید مرتبط ۱', 'صفحه ۱', etc."""
     if not text:
         return None
-    cleaned = normalize_persian_text(str(text))
+    raw_s = str(text)
+    # 1. Match Page_X or Page X directly from raw text
+    m = re.search(r'\bPage[_\s]*(\d+)\b', raw_s, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+
+    cleaned = normalize_persian_text(raw_s)
     
-    # 1. Match Page_X or Page X
+    # 2. Match Page_X or Page X from cleaned text
     m = re.search(r'\bPage[_\s]*(\d+)\b', cleaned, re.IGNORECASE)
     if m:
         return int(m.group(1))

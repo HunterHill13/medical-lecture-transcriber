@@ -84,7 +84,9 @@ SUBSCRIPT_CHAR_MAP = {
     '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
     '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
     '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎',
-    'a': 'ₐ', 'e': 'ₑ', 'o': 'ₒ', 'x': 'ₓ'
+    'a': 'ₐ', 'e': 'ₑ', 'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ', 'k': 'ₖ',
+    'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ', 'p': 'ₚ', 'r': 'ᵣ',
+    's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ', 'v': 'ᵥ', 'x': 'ₓ'
 }
 
 LATEX_MATH_SYMBOL_REPLACEMENTS = [
@@ -152,16 +154,21 @@ def sanitize_latex_math(text: str) -> str:
         t = re.sub(pat, rep, t)
 
     # 2. LaTeX wrappers like \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}
-    t = re.sub(r'\\(?:text|mathrm|mathbf|mathit)\s*\{([^}]*)\}', r'\1', t)
+    t = re.sub(r'\\\s*(?:text|mathrm|mathbf|mathit)\s*\{([^}]*)\}', r'\1', t)
 
     # 3. Fractions \frac{a}{b} -> (a / b)
-    t = re.sub(r'\\frac\s*\{([^}]*)\}\s*\{([^}]*)\}', r'(\1 / \2)', t)
+    t = re.sub(r'\\\s*frac\s*\{([^}]*)\}\s*\{([^}]*)\}', r'(\1 / \2)', t)
 
     # 4. Superscripts, subscripts, degree
-    t = re.sub(r'\^\{\s*\\circ\s*\}|\^\\circ|\\degree(?![a-zA-Z])', '°', t)
-    t = re.sub(r'\^\{([0-9\+\-n\(\)]+)\}', lambda m: ''.join(SUPERSCRIPT_CHAR_MAP.get(c, c) for c in m.group(1)), t)
-    t = re.sub(r'\_\{([0-9\+\-\(\)]+)\}', lambda m: ''.join(SUBSCRIPT_CHAR_MAP.get(c, c) for c in m.group(1)), t)
-    t = re.sub(r'\^([0-9\+\-n])', lambda m: SUPERSCRIPT_CHAR_MAP.get(m.group(1), m.group(0)), t)
+    t = re.sub(r'(?<=[A-Za-z0-9\)\}\]])\s*\^\s*\{\s*\\circ\s*\}|\^\{\s*\\circ\s*\}|\^\\circ|\\\s*degree(?![a-zA-Z])', '°', t)
+    t = re.sub(r'(?<=[A-Za-z0-9\)\}\]])\s*\^\s*\{([0-9\+\-n\(\)a-zA-Z]+)\}|\^\s*\{([0-9\+\-n\(\)a-zA-Z]+)\}',
+               lambda m: ''.join(SUPERSCRIPT_CHAR_MAP.get(c, c) for c in (m.group(1) or m.group(2))), t)
+    t = re.sub(r'(?<=[A-Za-z0-9\)\}\]])\s*\_\s*\{([0-9\+\-n\(\)a-zA-Z]+)\}|\_\s*\{([0-9\+\-n\(\)a-zA-Z]+)\}',
+               lambda m: ''.join(SUBSCRIPT_CHAR_MAP.get(c, c) for c in (m.group(1) or m.group(2))), t)
+    t = re.sub(r'(?<=[A-Za-z0-9\)\}\]])\s*\^\s*([0-9\+\-n])|\^\s*([0-9\+\-n])',
+               lambda m: SUPERSCRIPT_CHAR_MAP.get(m.group(1) or m.group(2), (m.group(1) or m.group(2))), t)
+    t = re.sub(r'(?<=[A-Z\)\}\]\d])\s*(?<!\\)\_\s*([0-9\+\-a-zA-Z])|(?<=[A-Z][a-z])\s*(?<!\\)\_\s*([0-9\+\-a-zA-Z])',
+               lambda m: SUBSCRIPT_CHAR_MAP.get(m.group(1) or m.group(2), (m.group(1) or m.group(2))), t)
 
     # 5. Spacing around relational/operator symbols when glued directly to digits
     t = re.sub(r'(?<=[≥≤≈≠±])(?=\d)', ' ', t)
@@ -311,6 +318,38 @@ BILINGUAL_MEDICAL_CONCEPTS = {
     "macrovascular": {"ماکروواسکولار", "عروق", "بزرگ"},
     "glycemic": {"قند", "گلیسمیک", "گلایسمیک", "گلوکز"},
     "statin": {"استاتین"},
+    "hypercalcemia": {"هایپرکلسمی", "هیپرکلسمی"},
+    "hypocalcemia": {"هایپوکلسمی", "هیپوکلسمی"},
+    "hyperparathyroidism": {"هایپرپاراتیروئیدیسم", "هیپرپاراتیروئیدیسم"},
+    "hypoparathyroidism": {"هایپوپاراتیروئیدیسم", "هیپوپاراتیروئیدیسم"},
+    "hypocalciuric": {"هایپوکلسیمیک", "هیپوکلسیمیک", "هایپوکلسینوریک", "هیپوکلسینوریک", "هایپوکلسینوری"},
+    "parathyroid-related": {"پاراتیروئید", "پاراتیروئیدی"},
+    "milk-alkali": {"شیر-قلیا", "شیرقلیا", "قلیا"},
+    "malignancy": {"بدخیمی", "بدخیم"},
+    "malignancies": {"بدخیمی", "بدخیم", "بدخیمی‌ها"},
+    "malignancy-related": {"بدخیمی", "بدخیم"},
+    "metastasis": {"متاستاز", "متاستازها", "متاستاتیک"},
+    "metastases": {"متاستاز", "متاستازها", "متاستاتیک"},
+    "metastatic": {"متاستاز", "متاستازها", "متاستاتیک"},
+    "leukemia": {"لوسمی", "لوکمی"},
+    "lymphoma": {"لنفوم"},
+    "myeloma": {"میلوم", "میلوما"},
+    "multiple": {"مولتیپل", "چندگانه", "متعدد"},
+    "sarcoidosis": {"سارکوئیدوز", "سارکوئیدوزی"},
+    "hematologic": {"خونی", "هماتولوژیک", "هماتولوژی"},
+    "solid": {"توپر", "سالید"},
+    "breast": {"پستان", "سینه"},
+    "lithium": {"لیتیوم"},
+    "aluminum": {"آلومینیوم", "الومینیوم"},
+    "intoxication": {"مسمومیت"},
+    "familial": {"فامیلیال", "خانوادگی"},
+    "syndrome": {"سندرم", "نشانگان"},
+    "failure": {"نارسایی", "شکست"},
+    "d-related": {"ویتامین"},
+    "vitamin": {"ویتامین"},
+    "etiologies": {"اتیولوژی", "علت", "علل", "سبب‌شناسی"},
+    "classification": {"طبقه‌بندی", "دسته‌بندی", "تقسیم‌بندی"},
+    "tertiary": {"ثالثیه", "سومین"},
 
     # Cardiovascular
     "hypertension": {"پرفشاری", "فشارخون", "هایپرتانسیون", "هیپرتانسیون", "فشار"},
@@ -989,7 +1028,9 @@ ENGLISH_PROSE_STOPWORDS = {
     "time", "times", "period", "periods", "day", "days", "week", "weeks", "month", "months", "year", "years",
     "country", "countries", "origin", "origins", "frequent", "frequently", "frequency",
     "population", "populations", "society", "societies", "world", "developed", "developing",
-    "decade", "decades", "century", "centuries", "prevalence", "permanent", "transient"
+    "decade", "decades", "century", "centuries", "prevalence", "permanent", "transient",
+    # Roman Numerals & List Enumerators
+    "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"
 }
 
 def extract_substantive_tokens(text_or_lines: Union[str, List[str]], max_stem_len: Optional[int] = None) -> Set[str]:

@@ -215,8 +215,10 @@ def add_r(p, text, font_name="Dubai", size_pt=11, bold=False, italic=False, colo
         else:
             rtl_elem.set(docx.oxml.ns.qn('w:val'), '1')
     else:
-        if rtl_elem is not None:
-            rPr.remove(rtl_elem)
+        if rtl_elem is None:
+            rPr.append(parse_xml(r'<w:rtl {} w:val="0"/>'.format(nsdecls('w'))))
+        else:
+            rtl_elem.set(docx.oxml.ns.qn('w:val'), '0')
             
     # Set explicit Complex Script font size (w:szCs) matching w:sz (in half-points)
     # Microsoft Word uses w:szCs for Persian/Arabic/Complex Script text.
@@ -265,13 +267,28 @@ def add_bidi_text(p, text, font_name="Dubai", size_pt=10.5, bold=False, italic=F
     if not any('\u0600' <= c <= '\u06FF' for c in text):
         add_r(p, text, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
         return
-    pattern = r'(\([A-Za-z0-9_\-\s,\./%α-ωΑ-Ω→⇌⇄<>=\+\^±≥≤≈≠×°µ·²³⁺⁻]+\)|(?:<=|>=|≥|≤|≈|≠|[<>=])\s*\d+(?:\.\d+)?|[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻]+(?:\s*(?:→|->|⇌|<->|⇄|<=|>=|≥|≤|≈|≠|<|>|=)\s*[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻]+)+|[A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻]{2,}|[→⇌⇄≥≤≈≠×°µ·])'
+    sci_chars = r'A-Za-z0-9_\-\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻⁰¹⁴⁵⁶⁷⁸⁹⁼⁽⁾ⁿ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎'
+    pattern = (
+        rf'(\d+(?:[,\.]\d+)?\([A-Za-z0-9_\-\s,\./%α-ωΑ-Ω\+\^±≥≤≈≠×°µ·²³⁺⁻⁰¹⁴⁵⁶⁷⁸⁹⁼⁽⁾ⁿ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎]+\)[{sci_chars}]*'
+        rf'|\([{sci_chars}\s,]+\)'
+        rf'|\[[{sci_chars}\s,]+\]'
+        rf'|\([^\)]*[\d\u06F0-\u06F9]+\s*[\+\-×÷=/\^±≥≤≈≠]\s*[^\)]*\)'
+        rf'|\[[^\]]*[\d\u06F0-\u06F9]+\s*[\+\-×÷=/\^±≥≤≈≠]\s*[^\]]*\]'
+        rf'|(?:<=|>=|≥|≤|≈|≠|[<>=])\s*\d+(?:\.\d+)?'
+        rf'|[{sci_chars}]+(?:\s*(?:→|->|⇌|<->|⇄|<=|>=|≥|≤|≈|≠|<|>|=)\s*[{sci_chars}]+)+'
+        rf'|[{sci_chars}]{{2,}}'
+        rf'|[→⇌⇄≥≤≈≠×°µ·])'
+    )
     tokens = re.split(pattern, text)
     for tok in tokens:
         if not tok:
             continue
         has_persian = any('\u0600' <= c <= '\u06FF' for c in tok)
-        if not has_persian and (re.search(r'[A-Za-z0-9→⇌⇄<>=≥≤≈≠×°µ·]', tok) or tok.startswith('(')):
+        is_math_expr = bool(
+            re.search(r'[\d\u06F0-\u06F9]\s*[\+\-×÷=/\^±≥≤≈≠]\s*', tok)
+            and (tok.strip().startswith('(') or tok.strip().startswith('['))
+        )
+        if (not has_persian and (re.search(r'[A-Za-z0-9→⇌⇄<>=≥≤≈≠×°µ·]', tok) or tok.startswith('('))) or is_math_expr:
             add_r(p, " " + tok.strip() + " ", font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=False)
         else:
             add_r(p, tok, font_name=font_name, size_pt=size_pt, bold=bold, italic=italic, color_rgb=color_rgb, is_rtl=True)

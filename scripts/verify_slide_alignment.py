@@ -362,6 +362,17 @@ def _check_structural_extras(num: int, raw_item: dict, trans_item: dict, issues:
                 "message": f"INCOMPLETE TABLE at Slide {num}: 'table_data' has 0 rows! A structured or image table must contain all translated rows.",
                 "remediation_action": "Populate 'table_data.rows' with all rows from the presentation table."
             })
+        elif raw_item.get("has_image_table") and len(rows) < 2:
+            issues.append({
+                "type": "INCOMPLETE_TABLE_TRANSCRIPTION",
+                "error_type": "INCOMPLETE_TABLE_TRANSCRIPTION",
+                "severity": "error",
+                "slide_number": num,
+                "message": (f"INCOMPLETE TABLE TRANSCRIPTION at Slide {num}: Slide contains an image-based reference table (has_image_table: True), "
+                            f"but 'table_data' contains only {len(rows)} row(s)! Image reference tables (Harrison/UpToDate) contain comprehensive classifications "
+                            f"or clinical criteria and must not be reduced to a single stub row. Transcribe and translate all categories and rows."),
+                "remediation_action": "Transcribe and translate 100% of rows and categories from the reference table image."
+            })
 
 def check_visual_asset_presence(num: int, raw_item: dict, trans_item: dict, img_dir: str = None) -> bool:
     """
@@ -722,17 +733,35 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
             if len(raw_table_tokens) >= 4:
                 table_common = evaluate_concept_overlap(raw_table_tokens, trans_table_tokens, " ".join(trans_table_texts))
                 table_recall = len(table_common) / max(1, len(raw_table_tokens))
-                if table_recall < 0.50:
+                if table_recall < 0.70:
                     missing_concepts = sorted(list(raw_table_tokens - table_common))[:8]
                     issues.append({
                         "type": "INCOMPLETE_TABLE_TRANSCRIPTION",
                         "error_type": "INCOMPLETE_TABLE_TRANSCRIPTION",
                         "severity": "error",
                         "slide_number": num,
+                        "recall_ratio": round(table_recall, 3),
+                        "required_threshold": 0.70,
                         "message": (f"INCOMPLETE TABLE TRANSCRIPTION at Slide {num}: Table substantive recall is {table_recall:.1%} "
-                                    f"(threshold: 50.0%). Key table rows, subcategories, or diagnostic criteria were omitted or summarized away. "
+                                    f"(threshold: 70.0%). Key table rows, subcategories, or diagnostic criteria were omitted or summarized away. "
                                     f"Uncovered table concepts: {missing_concepts}"),
                         "remediation_action": "Translate 100% of rows, subcategories, and parenthetical items in table_data without omitting clinical details."
+                    })
+            elif raw_item.get("has_image_table") and len(raw_table_tokens) == 0:
+                td_rows = []
+                if isinstance(td, dict):
+                    td_rows = td.get("rows") or td.get("items", [])
+                elif isinstance(td, (list, tuple)) and len(td) == 2:
+                    td_rows = td[1]
+                if len(td_rows) >= 2:
+                    issues.append({
+                        "type": "UNEXTRACTED_IMAGE_TABLE_OCR",
+                        "error_type": "UNEXTRACTED_IMAGE_TABLE_OCR",
+                        "severity": "warning",
+                        "slide_number": num,
+                        "message": (f"UNEXTRACTED IMAGE TABLE OCR at Slide {num}: Slide has has_image_table: True, but OCR extracted 0 text tokens. "
+                                    f"Automated table recall evaluation was bypassed. Inspect slide image visually to ensure complete coverage."),
+                        "remediation_action": f"Verify visual content of Slide {num} to ensure all rows in the image table are captured in table_data."
                     })
 
         # Check 3.3.0.1: Slide Numerical & Statistical Data Preservation Gate (SLIDE_NUMERICAL_DATA_OMISSION)
