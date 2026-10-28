@@ -912,7 +912,7 @@ def add_h2(doc, text, audio_time=None):
     add_r(p, text, font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
     if audio_time:
         start_t = extract_start_timestamp(audio_time) or audio_time
-        add_r(p, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
+        add_r(p, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0xD3, 0x54, 0x00))
     return p
 
 def add_body_p(doc, text, bold_prefix=""):
