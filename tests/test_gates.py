@@ -2308,3 +2308,74 @@ def test_custom_page_setup_applied_to_docx(tmp_path):
     # 3. Decorative Border (twistedLines2)
     xml_str = sec._sectPr.xml
     assert "twistedLines2" in xml_str
+
+
+def test_extract_start_timestamp_formats():
+    """Verifies extract_start_timestamp correctly extracts start time across various formats."""
+    from text_utils import extract_start_timestamp
+
+    assert extract_start_timestamp("04:30 - 07:45") == "04:30"
+    assert extract_start_timestamp("04:30 – 07:45") == "04:30"
+    assert extract_start_timestamp("04:30 — 07:45") == "04:30"
+    assert extract_start_timestamp("04:30 الی 07:45") == "04:30"
+    assert extract_start_timestamp("04:30 تا 07:45") == "04:30"
+    assert extract_start_timestamp("04:30 to 07:45") == "04:30"
+    assert extract_start_timestamp("04:30") == "04:30"
+    assert extract_start_timestamp("[04:30 - 07:45]") == "04:30"
+    assert extract_start_timestamp("دقیقه 04:30") == "04:30"
+    assert extract_start_timestamp("۰۴:۳۰ - ۰۷:۴۵") == "04:30"
+    assert extract_start_timestamp("1:04:30 - 1:07:45") == "1:04:30"
+    assert extract_start_timestamp(["04:30", "07:45"]) == "04:30"
+    assert extract_start_timestamp(270) == "04:30"
+    assert extract_start_timestamp("") is None
+    assert extract_start_timestamp(None) is None
+
+
+def test_concise_timestamp_in_slide_box_and_headings(tmp_path):
+    """Verifies that create_slide_pamphlet renders [⏱️04:30] instead of verbose ranges."""
+    import docx
+    import json
+    import re
+    from create_slide_pamphlet import build_pamphlet_from_json
+    from text_utils import parse_time_to_seconds
+
+    trans_json = tmp_path / "translated_slides.json"
+    out_docx = tmp_path / "pamphlet.docx"
+
+    slides = [
+        {
+            "slide_number": 1,
+            "title_en": "Peptic Ulcer Disease Overview",
+            "title_fa": "مبانی بیماری اولسر پپتیک",
+            "section_title": "مبانی بیماری اولسر پپتیک",
+            "content_en": ["Definition: Mucosal defect", "Major causes: H. pylori, NSAIDs"],
+            "content_fa": ["تعریف: نقص مخاطی معده یا دوازدهه", "علل اصلی: هلیکوباکتر پیلوری، داروهای ضدالتهاب غیراستروئیدی"],
+            "spoken_lecture": "استاد نعیمی در این بخش فرمودند که زخم پپتیک یک نقص مخاطی با عمق مشخص است.",
+            "audio_time": "04:30 - 07:45",
+            "audio_time_range": "04:30 - 07:45"
+        }
+    ]
+    trans_json.write_text(json.dumps(slides, ensure_ascii=False), encoding="utf-8")
+
+    build_pamphlet_from_json(str(trans_json), str(out_docx), title="جزوه گوارش")
+    doc = docx.Document(str(out_docx))
+
+    all_text = " ".join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
+            for c in row.cells:
+                all_text += " " + c.text
+
+    assert "[⏱️04:30]" in all_text, f"Concise timestamp [⏱️04:30] missing in docx text: {all_text}"
+    assert "زمان تدریس:" not in all_text, "Verbose 'زمان تدریس:' must not be present in docx"
+    assert "زمان فایل صوتی: دقیقه" not in all_text, "Verbose 'زمان فایل صوتی: دقیقه' must not be present in docx"
+
+    # Verify that verify_lecture_alignment alignment regex parses the concise timestamp from the generated H1
+    h1_paras = [p.text for p in doc.paragraphs if "مبانی بیماری اولسر پپتیک" in p.text and "⏱️" in p.text]
+    assert len(h1_paras) >= 1, "Expected H1 paragraph with stopwatch timestamp"
+    h1_text = h1_paras[0]
+    m = re.search(r'⏱️\s*(?:زمان فایل صوتی:\s*)?(?:دقیقه\s*)?([۰-۹0-9:]+)', h1_text)
+    assert m is not None, f"Regex failed to match timestamp in H1: {h1_text}"
+    assert m.group(1) == "04:30", f"Expected timestamp 04:30, got {m.group(1)}"
+    sec = parse_time_to_seconds(m.group(1))
+    assert sec == 270, f"Expected 270 seconds, got {sec}"

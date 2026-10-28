@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.9.0): enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.9.1): Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
   Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
@@ -79,7 +79,7 @@ Every agent implementing this skill **MUST** strictly adhere to the following co
 | **TOC Audio Time Col (2)**| Dubai | 10pt | Bold | `#D35400` (Deep Orange) | `<w:color w:val="D35400"/>` |
 | **TOC Other Cols (1, 3)**| Dubai | 10pt | Regular | `#262626` (Charcoal) | `<w:color w:val="262626"/>` |
 | **Section Heading (H1)** | Dubai | 14pt | Bold | `#78281F` (Burgundy) | `<w:sz w:val="28"/><w:szCs w:val="28"/><w:b/><w:bCs/>` |
-| **H1 Audio Time Tag** | Dubai | 10pt | Bold | `#D35400` (Deep Orange) | `[⏱️ زمان فایل صوتی: دقیقه XX:YY]` |
+| **H1 Audio Time Tag** | Dubai | 10pt | Bold | `#D35400` (Deep Orange) | `[⏱️XX:YY]` |
 | **Subheadings (H2)** | Dubai | 11pt | Bold | `#0E6251` (Forest Emerald) | Same size as body text, NOT enlarged! |
 | **Body Paragraphs** | Dubai | 11pt | Regular | `#262626` (Charcoal) | Line spacing 1.15, space after 3.5pt |
 | **Slide Box Outline** | - | 1pt | - | `#85C1E9` (Soft Sky Blue) | `<w:tcBorders><w:top w:sz="8" w:color="85C1E9"/>...` |
@@ -902,7 +902,8 @@ def add_h1(doc, text, audio_time=None):
     set_p_rtl(p, space_before=18, space_after=5)
     add_r(p, text, font_name="Dubai", size_pt=14, bold=True, color_rgb=(0x78, 0x28, 0x1F))
     if audio_time:
-        add_r(p, f"   [⏱️ زمان فایل صوتی: {audio_time}]", font_name="Dubai", size_pt=10, bold=True, color_rgb=(0xD3, 0x54, 0x00))
+        start_t = extract_start_timestamp(audio_time) or audio_time
+        add_r(p, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=10, bold=True, color_rgb=(0xD3, 0x54, 0x00))
     return p
 
 def add_h2(doc, text, audio_time=None):
@@ -910,7 +911,8 @@ def add_h2(doc, text, audio_time=None):
     set_p_rtl(p, space_before=11, space_after=3)
     add_r(p, text, font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
     if audio_time:
-        add_r(p, f"   [⏱️ {audio_time}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
+        start_t = extract_start_timestamp(audio_time) or audio_time
+        add_r(p, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
     return p
 
 def add_body_p(doc, text, bold_prefix=""):

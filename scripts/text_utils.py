@@ -7,7 +7,7 @@ and ceremonial slide detection.
 """
 
 import re
-from typing import Set, Union, List, Optional
+from typing import Set, Union, List, Optional, Any
 
 # Pre-compiled digit translation tables
 COMBINED_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
@@ -706,6 +706,38 @@ def format_seconds_to_time(seconds: int) -> str:
     if h > 0:
         return f"{h:02d}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
+
+def extract_start_timestamp(time_input: Any) -> Optional[str]:
+    """
+    Extracts the start timestamp (MM:SS or HH:MM:SS) from various formats:
+    - "04:30 - 07:45" -> "04:30"
+    - "04:30 الی 07:45" -> "04:30"
+    - "دقیقه 04:30" -> "04:30"
+    - "۰۴:۳۰ - ۰۷:۴۵" -> "04:30"
+    - ["04:30", "07:45"] -> "04:30"
+    - "04:30" -> "04:30"
+    - 270 (int/float seconds) -> "04:30"
+    """
+    if time_input is None:
+        return None
+    if isinstance(time_input, (int, float)):
+        return format_seconds_to_time(int(time_input))
+    if isinstance(time_input, (list, tuple)) and time_input:
+        time_input = time_input[0]
+    
+    s = str(time_input).strip().translate(COMBINED_DIGITS)
+    for sep in ['-', '–', '—', 'to', 'الی', 'تا']:
+        if sep in s:
+            s = s.split(sep)[0].strip()
+            break
+            
+    m = re.search(r'\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b', s)
+    if m:
+        return m.group(0)
+    m2 = re.search(r'(?:\d{1,2}:)?\d{1,2}:\d{2}', s)
+    if m2:
+        return m2.group(0)
+    return s if s else None
 
 def flatten_spoken_lecture(val: Union[str, List[object], None]) -> str:
     """Safely flattens spoken_lecture whether it is stored as a str, list[str], or None."""

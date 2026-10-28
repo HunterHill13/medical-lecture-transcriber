@@ -1,5 +1,5 @@
-"""
-version.py: Canonical Single Source of Truth for Medical Lecture Transcriber Version.
-"""
-__version__ = "5.9.0"
-VERSION = __version__
+"""
+version.py: Canonical Single Source of Truth for Medical Lecture Transcriber Version.
+"""
+__version__ = "5.9.1"
+VERSION = __version__

@@ -47,7 +47,8 @@ from text_utils import (
     parse_markdown_blocks,
     flatten_spoken_lecture,
     sanitize_ref_note,
-    sanitize_latex_math
+    sanitize_latex_math,
+    extract_start_timestamp
 )
 
 def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
@@ -386,7 +387,8 @@ def add_h1(doc, text, audio_time=None):
     set_p_rtl(p, space_before=18, space_after=5)
     add_r(p, text, font_name="Dubai", size_pt=14, bold=True, color_rgb=(0x78, 0x28, 0x1F))
     if audio_time:
-        add_r(p, f"   [⏱️ زمان فایل صوتی: {audio_time}]", font_name="Dubai", size_pt=10, bold=True, color_rgb=(0xD3, 0x54, 0x00))
+        start_t = extract_start_timestamp(audio_time) or audio_time
+        add_r(p, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=10, bold=True, color_rgb=(0xD3, 0x54, 0x00))
     return p
 
 def add_h2(doc, text, audio_time=None):
@@ -394,7 +396,8 @@ def add_h2(doc, text, audio_time=None):
     set_p_rtl(p, space_before=11, space_after=3)
     add_r(p, text, font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
     if audio_time:
-        add_r(p, f"   [⏱️ {audio_time}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
+        start_t = extract_start_timestamp(audio_time) or audio_time
+        add_r(p, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0x78, 0x28, 0x1F))
     return p
 
 def add_body_p(doc, text, bold_prefix=""):
@@ -735,7 +738,9 @@ def add_slide_box_from_json(doc, slide_data, img_path=None, table_data=None, ref
     else:
         audio_range = slide_data.get("audio_time_range") or slide_data.get("audio_time")
         if audio_range:
-            add_r(p0, f"  [⏱️ زمان تدریس: {audio_range}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0xD3, 0x54, 0x00))
+            start_t = extract_start_timestamp(audio_range)
+            if start_t:
+                add_r(p0, f"  [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0xD3, 0x54, 0x00))
         
     # Row 1: Content Area (White background, 1pt Soft Sky Blue Border #85C1E9)
     cell1 = tbl.cell(1, 0)
@@ -975,7 +980,8 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
     set_p_rtl(p_h, space_before=12, space_after=3)
     add_r(p_h, "🎙️ تدریس و بیانات کلاسی استاد", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
     if audio_time:
-        add_r(p_h, f"   [⏱️ زمان فایل صوتی: دقیقه {audio_time}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0xD3, 0x54, 0x00))
+        start_t = extract_start_timestamp(audio_time) or audio_time
+        add_r(p_h, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0xD3, 0x54, 0x00))
         
     blocks = parse_markdown_blocks(spoken_text)
     for block in blocks:
@@ -1083,7 +1089,7 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
     for i, s in enumerate(slides):
         if s.get("section_title"):
             stitle = s.get("section_title")
-            atime = s.get("audio_time", "")
+            atime = extract_start_timestamp(s.get("audio_time", "")) or s.get("audio_time", "")
             snum = s.get("slide_number", i + 1)
             # Find range of slides in this section until next section_title or end
             end_snum = snum
