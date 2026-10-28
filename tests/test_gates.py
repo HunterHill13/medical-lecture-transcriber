@@ -2379,3 +2379,119 @@ def test_concise_timestamp_in_slide_box_and_headings(tmp_path):
     assert m.group(1) == "04:30", f"Expected timestamp 04:30, got {m.group(1)}"
     sec = parse_time_to_seconds(m.group(1))
     assert sec == 270, f"Expected 270 seconds, got {sec}"
+
+
+def test_clean_lecture_parentheses_anti_glossary():
+    """Verifies that clean_lecture_parentheses strips routine dictionary English translations while preserving clinical acronyms."""
+    from text_utils import clean_lecture_parentheses
+
+    raw_lecture = (
+        "کاردیا (Cardia) و پیلور در این بخش بررسی شد. "
+        "خوش‌خیم (Benign) بودن زخم بیمار مبتلا به بیماری پپتیک (PUD) تایید گردید. "
+        "بیمار از نفخ (Bloating) و سوءهاضمه (Indigestion) شکایت داشت. "
+        "درمان با مهارکننده پمپ پروتون (PPI) با دوز روزانه (bid) و رژیم ضد هلیکوباکتر پیلوری (H. pylori) و قطع مسکن‌ها (NSAIDs) تجویز شد. "
+        "آزمایش مدفوع (SAT)، تست تنفسی (UBT) و اندوسکوپی (EGD) انجام گرفت. "
+        "معده (Stomach) دچار نقص مخاطی (Mucosal defect) شده بود."
+    )
+
+    cleaned = clean_lecture_parentheses(raw_lecture)
+
+    # Disallowed routine English words must be removed
+    assert "(Cardia)" not in cleaned
+    assert "(Benign)" not in cleaned
+    assert "(Bloating)" not in cleaned
+    assert "(Indigestion)" not in cleaned
+    assert "(Stomach)" not in cleaned
+    assert "(Mucosal defect)" not in cleaned
+
+    # Allowed clinical acronyms and standard abbreviations must be preserved
+    assert "(PUD)" in cleaned
+    assert "(PPI)" in cleaned
+    assert "(H. pylori)" in cleaned
+    assert "(NSAIDs)" in cleaned
+    assert "(SAT)" in cleaned
+    assert "(UBT)" in cleaned
+    assert "(EGD)" in cleaned
+    assert "(bid)" in cleaned
+
+
+def test_split_structured_lead_detection():
+    """Verifies split_structured_lead correctly extracts bold, emoji, numbered, and descriptive leads."""
+    from text_utils import split_structured_lead
+
+    # 1. Numbered lead
+    l1, b1 = split_structured_lead("۱. سد پیشاپیتلیال: این لایه شامل موکوس و بی‌کربنات است.")
+    assert l1 == "۱. سد پیشاپیتلیال:"
+    assert b1 == "این لایه شامل موکوس و بی‌کربنات است."
+
+    # 2. Markdown bold lead
+    l2, b2 = split_structured_lead("**کیس بالینی:** بیمار ۳۵ ساله مراجعه نموده است.")
+    assert l2 == "کیس بالینی:"
+    assert b2 == "بیمار ۳۵ ساله مراجعه نموده است."
+
+    # 3. Emoji alert lead
+    l3, b3 = split_structured_lead("🚨 علائم هشدار: دیسفاژی پیشرونده نیازمند ارزیابی فوری است.")
+    assert l3 == "🚨 علائم هشدار:"
+    assert b3 == "دیسفاژی پیشرونده نیازمند ارزیابی فوری است."
+
+    # 4. Short descriptive lead
+    l4, b4 = split_structured_lead("علل اصلی زخم پپتیک: عفونت هلیکوباکتر و مصرف مسکن‌ها هستند.")
+    assert l4 == "علل اصلی زخم پپتیک:"
+    assert b4 == "عفونت هلیکوباکتر و مصرف مسکن‌ها هستند."
+
+    # 5. Plain continuous prose (no lead)
+    l5, b5 = split_structured_lead("استاد در تشریح این مبحث فرمودند که بیماری پپتیک بسیار شایع است.")
+    assert l5 == ""
+    assert b5 == "استاد در تشریح این مبحث فرمودند که بیماری پپتیک بسیار شایع است."
+
+
+def test_spoken_lecture_emerald_lead_and_antiglossary_rendering(tmp_path):
+    """Verifies create_slide_pamphlet renders Track 1 leads in emerald green #1E8449 and filters routine glossary parentheses."""
+    import docx
+    import json
+    from create_slide_pamphlet import build_pamphlet_from_json
+
+    trans_json = tmp_path / "translated_slides.json"
+    out_docx = tmp_path / "pamphlet.docx"
+
+    slides = [
+        {
+            "slide_number": 1,
+            "title_en": "Peptic Ulcer Pathophysiology",
+            "title_fa": "فیزیوپاتولوژی زخم پپتیک",
+            "section_title": "فیزیوپاتولوژی زخم پپتیک",
+            "content_en": ["Mucosal defense mechanisms", "Gastric and duodenal ulcers"],
+            "content_fa": ["مکانیسم‌های دفاع مخاطی", "زخم‌های معده و دوازدهه"],
+            "spoken_lecture": (
+                "استاد در ابتدای تدریس اشاره فرمودند که کاردیا (Cardia) و معده (Stomach) دارای سدهای دفاعی هستند.\n\n"
+                "۱. سد پیشاپیتلیال: این لایه شامل ترشح موکوس و بی‌کربنات است و بیماران مبتلا به اولسر (PUD) در این بخش دچار نقص می‌شوند.\n\n"
+                "🚨 علائم هشدار: کاهش وزن غیرقابل توجیه و استفراغ مکرر از موارد نیازمند بررسی سریع با اندوسکوپی (EGD) هستند."
+            ),
+            "audio_time": "05:15"
+        }
+    ]
+    trans_json.write_text(json.dumps(slides, ensure_ascii=False), encoding="utf-8")
+
+    build_pamphlet_from_json(str(trans_json), str(out_docx), title="جزوه گوارش")
+    doc = docx.Document(str(out_docx))
+
+    all_text = " ".join(p.text for p in doc.paragraphs)
+
+    # 1. Anti-glossary check
+    assert "(Cardia)" not in all_text, "Routine English glossary '(Cardia)' must be stripped"
+    assert "(Stomach)" not in all_text, "Routine English glossary '(Stomach)' must be stripped"
+    assert "(PUD)" in all_text, "Clinical acronym '(PUD)' must be preserved"
+    assert "(EGD)" in all_text, "Clinical acronym '(EGD)' must be preserved"
+
+    # 2. Check Emerald Green (#1E8449 -> 0x1E, 0x84, 0x49) runs
+    emerald_runs = []
+    for p in doc.paragraphs:
+        for r in p.runs:
+            if r.font.color and r.font.color.rgb:
+                color_hex = str(r.font.color.rgb).upper()
+                if color_hex == "1E8449":
+                    emerald_runs.append(r.text.strip())
+
+    assert len(emerald_runs) >= 2, f"Expected at least 2 emerald green leads, found: {emerald_runs}"
+    assert any("۱. سد پیشاپیتلیال:" in r for r in emerald_runs), f"Missing numbered emerald lead in {emerald_runs}"
+    assert any("🚨 علائم هشدار:" in r for r in emerald_runs), f"Missing emoji emerald lead in {emerald_runs}"

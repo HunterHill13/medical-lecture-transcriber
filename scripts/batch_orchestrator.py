@@ -37,6 +37,7 @@ if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
 from text_utils import (
+    clean_lecture_parentheses,
     sanitize_latex_math,
     sanitize_ref_note,
     normalize_for_display,
@@ -129,6 +130,8 @@ def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرن
     for str_key in ("title_fa", "title_en", "section_title", "spoken_lecture", "audio_time_range"):
         if isinstance(s.get(str_key), str):
             s[str_key] = sanitize_latex_math(s[str_key])
+    if isinstance(s.get("spoken_lecture"), str):
+        s["spoken_lecture"] = clean_lecture_parentheses(s["spoken_lecture"])
 
     if isinstance(s.get("ref_note"), str) and s["ref_note"].strip():
         s["ref_note"] = sanitize_ref_note(sanitize_latex_math(s["ref_note"]))
@@ -346,6 +349,12 @@ def partition_slides(
                     "NEVER import or leak verbal explanations spoken by the professor into slide bullets (spoken explanations belong strictly to Track 1 'spoken_lecture'). "
                     "NEVER use external/parametric medical memory (Harrison, UpToDate) to fabricate or expand bullets that do not exist on the slide. "
                     "The number and semantics of bullets must strictly correspond to the raw slide's lines."
+                ),
+                "rule_10_track_1_anti_glossary_and_structured_leadin": (
+                    "In Track 1 ('spoken_lecture'), NEVER insert English translations of routine words, organs, symptoms, or descriptors in parentheses "
+                    "(e.g. (Cardia), (Benign), (Bloating), (Indigestion)). English parentheses are strictly restricted to valid clinical acronyms (PUD, PPI, EGD, UBT, SAT, etc.). "
+                    "For clinical cases, alert signs, numbered steps, or comparisons, start paragraphs with a clear lead ending in a colon (e.g. '۱. سد پیشاپیتلیال:' or '🚨 دیسفاژی پیشرونده:') "
+                    "so the pamphlet styler can highlight it in emerald green (#1E8449)."
                 ),
             },
             "halo_prev": halo_prev,

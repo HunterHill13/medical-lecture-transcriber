@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.9.1): Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.9.2): Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
   Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
@@ -173,6 +173,10 @@ To eliminate any conflict between classroom lecture flow and slide translation f
    - شامل ۱۰۰٪ گفتار استاد، الگوریتم‌های تشخیصی، هشدارهای بالینی (مثلاً عدم درخواست عجولانه MRI در اورژانس به دلیل اینسیدنتالوماهای ۷٪ آدرنال و ۱۰٪ هیپوفیز)، توجیهات فیزیولوژیک و تعاملات کلاسی است.
    - فیلد `spoken_lecture` در هر اسلاید ذخیره شده و توسط `create_slide_pamphlet.py` دقیقاً قبل از کادر اسلاید با آیکون `🎙️ تدریس و بیانات کلاسی استاد` رندر می‌شود.
    - اسلایدهای شروع فصل دارای فیلد اختیاری `section_title` هستند که تیتر H1 و ردیف جدول فهرست مطالب (TOC) را به صورت خودکار ایجاد می‌کنند.
+   - **Track 1 Anti-Glossary Rule (قانون منع پرانتزگذاری معادل‌های انگلیسی در ویس استاد):**
+     در نگارش شرح بیانات استاد (`spoken_lecture`)، از درج معادل انگلیسی واژگان عمومی، اسامی اندام‌ها، بیماری‌های شناخته‌شده و افعال در پرانتز (مانند `(Cardia)`، `(Benign)`، `(Bloating)`، `(Indigestion)`) اکیداً خودداری کنید. پرانتز انگلیسی منحصراً به سرواژه‌های معتبر بالینی (PUD, PPI, EGD, UBT, SAT, etc.) محدود است. فیلتر خودکار `clean_lecture_parentheses` معادل‌های مازاد را پیش از رندر پالایش می‌کند.
+   - **Track 1 Structured Lead-In Rule (قانون لیدهای ساختارمند در ویس استاد):**
+     هرگاه بیانات استاد شامل فهرست، شماره‌گذاری، کیس بالینی، علائم خطر یا مقایسه درمانی است، پاراگراف را با یک لید صریح منتهی به دو نقطه `:` آغاز نمایید (مانند `۱. سد پیشاپیتلیال:` یا `🚨 دیسفاژی پیشرونده:` یا `کیس بالینی:`) تا موتور استایل‌بندی Word آن را با رنگ سبز زمردی فاخر `#1E8449` و بدنه زغالی `#262626` رندر نماید.
 
 2. **Track 2: کادر اسلاید مرتبط (Dedicated Slide Box):**
    - Serves as a 100% faithful, isolated, literal mirror of the English slide.

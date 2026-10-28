@@ -1182,10 +1182,48 @@ def extract_substantive_tokens(text_or_lines: Union[str, List[str]], max_stem_le
     return substantive
 
 
+# Common recognized clinical acronyms, Latin binomials, and dosage abbreviations (case-insensitive set)
+ALLOWED_CLINICAL_ACRONYMS = {
+    "hba1c", "maltoma", "mrna", "trna", "rrna", "cd4", "cd8", "iga", "igg", "igm", "ige",
+    "h.pylori", "h. pylori", "e.coli", "e. coli", "c.difficile", "c. difficile",
+    "nsaids", "nsaid", "dmards", "snris", "ssris", "acei", "arbs", "ppis", "t3", "t4", "ft3", "ft4", "pth",
+    "pud", "gerd", "ppi", "egd", "ubt", "sat", "rut", "fd", "pds", "eps", "zes", "goo", "tca", "tcas",
+    "avp", "dic", "siadh", "tsh", "acth", "men1", "men2", "copd", "cad", "chd", "ckd", "aki",
+    "dka", "hhs", "sle", "ra", "ibd", "uc", "cd", "nafld", "nash", "hcv", "hbv", "hiv",
+    "cox-1", "cox-2", "cox1", "cox2", "pcab", "p-cab", "dapt", "bid", "qid", "tid", "otc",
+    "gej", "z-line", "dst", "ogtt", "bap", "dhea", "dheas", "shbg", "fsh", "lh", "prl", "gh",
+    "igf-1", "igf1", "gnrh", "crh", "trh", "cbc", "bun", "cr", "alt", "ast", "ldl", "hdl",
+    "ecg", "ekg", "cxr", "ct", "mri", "us", "pet"
+}
+RECOGNIZED_ACRONYMS = ALLOWED_CLINICAL_ACRONYMS
+
+# Routine prose words, verbs, descriptors that must NEVER be parenthesized in slide bullets or spoken lecture
+DISALLOWED_PROSE_WORDS = {
+    "define", "defines", "defined", "defining", "definition", "definitions",
+    "older", "younger", "elderly", "aged", "age", "ages",
+    "smoke", "smoking", "smoker", "smokers",
+    "appropriate", "appropriately", "inappropriate", "inappropriately",
+    "testing", "tested", "test", "tests",
+    "treatment", "treatments", "treat", "treated", "treating",
+    "management", "manage", "managed", "managing",
+    "complication", "complications",
+    "stomach", "duodenum", "duodenal", "mucosal", "mucosa", "defect", "defects",
+    "ulcer", "ulcers", "peptic", "gastric", "dyspepsia", "weight", "loss", "pain",
+    "bleeding", "hemorrhage", "perforation", "obstruction", "nausea", "vomiting",
+    "feature", "features", "finding", "findings", "risk", "risks", "factor", "factors",
+    "common", "commonly", "general", "generally", "typical", "atypical",
+    "initial", "initially", "subsequent", "subsequently", "presentation", "presentations",
+    "investigation", "investigations", "evaluation", "evaluations", "assessment", "assessments",
+    "examination", "examinations", "exam", "exams", "history", "physical",
+    "primary", "secondary", "tertiary", "acute", "chronic", "benign", "malignant",
+    "cardia", "bloating", "indigestion", "satiety", "anorexia", "alarm"
+}
+
+
 def is_allowed_parenthetical(p_str: str) -> bool:
     """
     Validates whether an English parenthetical substring within translated slide bullets
-    is an allowable clinical abbreviation, dosage/number, or specific medical entity,
+    or lecture narrative is an allowable clinical abbreviation, dosage/number, or specific medical entity,
     or an un-translated routine English word (e.g. '(Define)', '(Older age)', '(Smoking)').
     """
     clean = p_str.strip()
@@ -1200,37 +1238,6 @@ def is_allowed_parenthetical(p_str: str) -> bool:
     if not en_words:
         return True
 
-    # Common recognized acronyms and Latin binomials (case-insensitive set)
-    RECOGNIZED_ACRONYMS = {
-        "hba1c", "maltoma", "mrna", "trna", "rrna", "cd4", "cd8", "iga", "igg", "igm", "ige",
-        "h.pylori", "h. pylori", "e.coli", "e. coli", "c.difficile", "c. difficile",
-        "nsaids", "nsaid", "dmards", "snris", "ssris", "acei", "arbs", "ppis", "t3", "t4", "ft3", "ft4", "pth",
-        "pud", "gerd", "ppi", "egd", "ubt", "sat", "rut", "fd", "pds", "eps", "zes", "goo", "tca",
-        "avp", "dic", "siadh", "tsh", "acth", "men1", "men2", "copd", "cad", "chd", "ckd", "aki",
-        "dka", "hhs", "sle", "ra", "ibd", "uc", "cd", "nafld", "nash", "hcv", "hbv", "hiv"
-    }
-
-    # Routine prose words, verbs, descriptors that must NEVER be parenthesized in slide bullets
-    DISALLOWED_PROSE_WORDS = {
-        "define", "defines", "defined", "defining", "definition", "definitions",
-        "older", "younger", "elderly", "aged", "age", "ages",
-        "smoke", "smoking", "smoker", "smokers",
-        "appropriate", "appropriately", "inappropriate", "inappropriately",
-        "testing", "tested", "test", "tests",
-        "treatment", "treatments", "treat", "treated", "treating",
-        "management", "manage", "managed", "managing",
-        "complication", "complications",
-        "stomach", "duodenum", "duodenal", "mucosal", "mucosa", "defect", "defects",
-        "ulcer", "ulcers", "peptic", "gastric", "dyspepsia", "weight", "loss", "pain",
-        "bleeding", "hemorrhage", "perforation", "obstruction", "nausea", "vomiting",
-        "feature", "features", "finding", "findings", "risk", "risks", "factor", "factors",
-        "common", "commonly", "general", "generally", "typical", "atypical",
-        "initial", "initially", "subsequent", "subsequently", "presentation", "presentations",
-        "investigation", "investigations", "evaluation", "evaluations", "assessment", "assessments",
-        "examination", "examinations", "exam", "exams", "history", "physical",
-        "primary", "secondary", "tertiary", "acute", "chronic", "benign", "malignant"
-    }
-
     # If any word in the parenthetical is a known disallowed prose word, fail immediately
     for w in en_words:
         w_lower = w.lower().strip('.')
@@ -1242,7 +1249,7 @@ def is_allowed_parenthetical(p_str: str) -> bool:
         w_lower = w.lower().strip('.')
         if not re.search(r'[A-Za-z]', w):
             continue
-        if w_lower in RECOGNIZED_ACRONYMS or clean.lower() in RECOGNIZED_ACRONYMS:
+        if w_lower in ALLOWED_CLINICAL_ACRONYMS or clean.lower() in ALLOWED_CLINICAL_ACRONYMS:
             continue
         # Standard UPPERCASE acronym (2+ uppercase characters, e.g. PUD, GERD, PPI, ACTH, MEN1)
         if re.fullmatch(r'^[A-Z0-9\+\-]{2,10}$', w):
@@ -1260,6 +1267,72 @@ def is_allowed_parenthetical(p_str: str) -> bool:
         return False
 
     return True
+
+
+def clean_lecture_parentheses(text: str) -> str:
+    """
+    Sanitizes Track 1 spoken lecture narrative by automatically removing
+    redundant English dictionary translation parentheses for routine words,
+    organs, symptoms, and descriptors (e.g. 'کاردیا (Cardia)', 'خوش‌خیم (Benign)',
+    'نفخ (Bloating)', 'سوءهاضمه (Indigestion)'), while strictly preserving
+    valid clinical acronyms, dosages, measurements, and Latin abbreviations
+    (e.g. '(PUD)', '(PPI)', '(EGD)', '(H. pylori)', '(NSAIDs)', '(bid)').
+    """
+    if not text or not isinstance(text, str):
+        return text or ""
+        
+    def filter_func(match):
+        raw = match.group(1).strip()
+        if is_allowed_parenthetical(raw):
+            return f"({raw})"
+        return ""
+        
+    cleaned = re.sub(r'\(([A-Za-z0-9\s\.\-\/\+\=]{2,})\)', filter_func, text)
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\s+([:،\.؛])', r'\1', cleaned)
+    return cleaned.strip()
+
+
+def split_structured_lead(text: str) -> tuple[str, str]:
+    """
+    Extracts structured lead-in (up to first colon) from a paragraph.
+    Matches:
+    - Markdown bold lead: **Lead**: Body
+    - Emoji lead: 🚨 دیسفاژی پیشرونده: Body
+    - Numbered lead: ۱. سد موکوسی: Body or 1. سد موکوسی: Body
+    - Short descriptive lead (<= 6 words, <= 45 chars) ending in ':'
+    Returns (lead, body). If no lead is present, returns ("", text).
+    """
+    if not text:
+        return "", ""
+    t = text.strip()
+    
+    # 1. Markdown bold lead: **Lead**: Body
+    m_bold = re.match(r'^\*\*(.*?)\*\*[:\s]*(.*)$', t)
+    if m_bold:
+        lead = m_bold.group(1).strip()
+        if not lead.endswith(':'):
+            lead += ':'
+        return lead, m_bold.group(2).strip()
+        
+    # 2. Emoji lead: 🚨 دیسفاژی: Body
+    m_emoji = re.match(r'^([🚨⚠️📌💡❓🩺💊🔬🔍]\s*[^:\n]{2,35}:)\s*(.*)$', t)
+    if m_emoji:
+        return m_emoji.group(1).strip(), m_emoji.group(2).strip()
+        
+    # 3. Numbered lead: ۱. سد موکوسی: Body or 1. سد موکوسی: Body
+    m_num = re.match(r'^([۰-۹0-9]+[\.\)]\s*[^:\n]{2,40}:)\s*(.*)$', t)
+    if m_num:
+        return m_num.group(1).strip(), m_num.group(2).strip()
+        
+    # 4. Short plain lead ending in ':' (up to 6 words)
+    if ':' in t and not t.startswith('http'):
+        parts = t.split(':', 1)
+        lead_cand = parts[0].strip()
+        if len(lead_cand.split()) <= 6 and len(lead_cand) <= 45:
+            return lead_cand + ':', parts[1].strip()
+            
+    return "", t
 
 
 def evaluate_concept_overlap(raw_tokens: Set[str], trans_tokens: Set[str], trans_text: str) -> Set[str]:
@@ -1726,7 +1799,7 @@ def parse_markdown_blocks(text: Union[str, list, None]) -> List[dict]:
             continue
 
         # 4. Check numbered list item
-        m_num = re.match(r'^\s*(\d+)[\.\)]\s+(.+)$', line)
+        m_num = re.match(r'^\s*([۰-۹0-9]+)[\.\)]\s+(.+)$', line)
         if m_num:
             flush_para()
             num = m_num.group(1)

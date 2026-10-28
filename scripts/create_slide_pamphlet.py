@@ -48,7 +48,9 @@ from text_utils import (
     flatten_spoken_lecture,
     sanitize_ref_note,
     sanitize_latex_math,
-    extract_start_timestamp
+    extract_start_timestamp,
+    clean_lecture_parentheses,
+    split_structured_lead
 )
 
 def convert_image_to_png(src_path: str, dst_path: str = None) -> str:
@@ -327,10 +329,18 @@ def add_formatted_bidi_text(p, text_or_runs, font_name="Dubai", size_pt=10.5, de
         r_italic = r.get("italic", default_italic)
         add_bidi_text(p, r_text, font_name=font_name, size_pt=size_pt, bold=r_bold, italic=r_italic, color_rgb=color_rgb)
 
-def add_numbered_p(doc, num, body):
+def add_numbered_p(doc, num, body, num_color=(0x78, 0x28, 0x1F)):
     p = doc.add_paragraph()
     set_p_rtl(p, space_before=2, space_after=2, align_justify=True)
-    add_r(p, f"{num}. ", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x78, 0x28, 0x1F))
+    clean_body = clean_markdown_text(body).strip()
+    if ":" in clean_body and not clean_body.startswith("http"):
+        parts = clean_body.split(":", 1)
+        lead_cand = parts[0].strip()
+        if len(lead_cand.split()) <= 6 and len(lead_cand) <= 45:
+            add_r(p, f"{num}. {lead_cand}: ", font_name="Dubai", size_pt=11, bold=True, color_rgb=num_color)
+            add_formatted_bidi_text(p, parts[1].strip(), font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
+            return p
+    add_r(p, f"{num}. ", font_name="Dubai", size_pt=11, bold=True, color_rgb=num_color)
     add_formatted_bidi_text(p, body, font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
     return p
 
@@ -409,16 +419,16 @@ def add_body_p(doc, text, bold_prefix=""):
     add_formatted_bidi_text(p, text, font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
     return p
 
-def add_bullet_p(doc, lead, body):
+def add_bullet_p(doc, lead, body, lead_color=(0x0E, 0x62, 0x51)):
     p = doc.add_paragraph()
     set_p_rtl(p, space_before=2, space_after=2, align_justify=True)
     clean_lead = clean_markdown_text(lead).strip() if lead else ""
     if clean_lead:
         if not clean_lead.endswith(":"):
             clean_lead += ":"
-        add_r(p, "• " + clean_lead + " ", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
+        add_r(p, "• " + clean_lead + " ", font_name="Dubai", size_pt=11, bold=True, color_rgb=lead_color)
     else:
-        add_r(p, "• ", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
+        add_r(p, "• ", font_name="Dubai", size_pt=11, bold=True, color_rgb=lead_color)
     add_formatted_bidi_text(p, body, font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
     return p
 
@@ -976,6 +986,9 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
     if not spoken_text:
         return
         
+    # Clean routine English dictionary translation parentheses from lecture audio narrative
+    spoken_text = clean_lecture_parentheses(spoken_text)
+        
     p_h = doc.add_paragraph()
     set_p_rtl(p_h, space_before=12, space_after=3)
     add_r(p_h, "🎙️ تدریس و بیانات کلاسی استاد", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
@@ -989,13 +1002,19 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
         if b_type == "heading":
             add_h2(doc, block.get("text", ""))
         elif b_type == "bullet":
-            add_bullet_p(doc, block.get("lead", ""), block.get("text", ""))
+            add_bullet_p(doc, block.get("lead", ""), block.get("text", ""), lead_color=(0x1E, 0x84, 0x49))
         elif b_type == "numbered":
-            add_numbered_p(doc, block.get("num", "1"), block.get("text", ""))
+            add_numbered_p(doc, block.get("num", "1"), block.get("text", ""), num_color=(0x1E, 0x84, 0x49))
         elif b_type == "paragraph":
+            p_text = block.get("text", "")
+            lead, body = split_structured_lead(p_text)
             p = doc.add_paragraph()
             set_p_rtl(p, space_before=2.5, space_after=3.5, align_justify=True)
-            add_formatted_bidi_text(p, block.get("text", ""), font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
+            if lead:
+                add_r(p, lead + " ", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x1E, 0x84, 0x49))
+                add_formatted_bidi_text(p, body, font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
+            else:
+                add_formatted_bidi_text(p, p_text, font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
 
 def apply_custom_page_setup(section, enable_border: bool = True):
     """
