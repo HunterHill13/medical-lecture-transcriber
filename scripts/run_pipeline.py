@@ -301,6 +301,8 @@ def cmd_build(args):
         raw_path = "raw_slides.json"
     if raw_path and os.path.isfile(raw_path):
         cmd.extend(["--raw", raw_path])
+    if getattr(args, "no_page_border", False):
+        cmd.append("--no-page-border")
     build_ok = run_cmd(cmd, f"Compiling publication-grade Word study guide to {output}")
     if not build_ok:
         return 1
@@ -489,6 +491,7 @@ def main():
     p_build.add_argument("--max-drift", type=int, default=None)
     p_build.add_argument("--allow-review", action="store_true")
     p_build.add_argument("--auto-fix", action="store_true")
+    p_build.add_argument("--no-page-border", action="store_true", help="Disable twistedLines2 decorative page borders.")
 
     # publish
     p_publish = subparsers.add_parser("publish", help="Certified publication pipeline: verify -> build -> post-verify")
@@ -506,6 +509,7 @@ def main():
     p_publish.add_argument("--max-drift", type=int, default=None)
     p_publish.add_argument("--allow-review", action="store_true")
     p_publish.add_argument("--auto-fix", action="store_true")
+    p_publish.add_argument("--no-page-border", action="store_true", help="Disable twistedLines2 decorative page borders.")
 
     # annotate
     p_annotate = subparsers.add_parser("annotate", help="Inject structured RTL callout notes into existing DOCX (Mode B)")
@@ -538,6 +542,7 @@ def main():
     p_all.add_argument("--strict-drift", action="store_true", help="Enforce strict 60-second drift cap regardless of lecture length")
     p_all.add_argument("--max-drift", type=int, default=None, help="Explicit maximum allowed drift seconds")
     p_all.add_argument("--allow-review", action="store_true", help="Permit pipeline to complete with status REVIEW_REQUIRED (generating document with warning badges) instead of hard exit 1")
+    p_all.add_argument("--no-page-border", action="store_true", help="Disable twistedLines2 decorative page borders.")
 
 
     args = parser.parse_args()

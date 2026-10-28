@@ -518,8 +518,8 @@ def test_verify_slide_and_lecture_alignment_accepts_dict_wrapped_slides(tmp_path
                     "title_fa": "تشخیص سندرم کوشینگ",
                     "title_en": "Cushing syndrome diagnosis",
                     "bullets": [
-                        ["افزایش کورتیزول", "سطح بالای کورتیزول (Cortisol elevation)"],
-                        ["تست دگزامتازون", "آزمون سرکوب دگزامتازون (Dexamethasone suppression test)"],
+                        ["افزایش کورتیزول", "سطح بالای کورتیزول و علائم بالینی اختصاصی"],
+                        ["تست دگزامتازون", "آزمون سرکوب دگزامتازون (DST) و ارزیابی آزمایشگاهی"],
                     ],
                     "ref_note": "نکته رفرنس هاریسون جهت تشریح مبحث",
                 }

@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.8.7): enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.9.0): enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
   Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
@@ -30,9 +30,9 @@ description: >-
   bullets, and slide master template backgrounds; extracts pure clinical diagrams and prioritizes them over full-slide screenshots; enforces Smart Text
   Slide Screenshot Guard suppressing redundant English screenshots on pure text slides), Table Completeness Gate (INCOMPLETE_TABLE_TRANSCRIPTION
   with tightened 70% threshold, UNEXTRACTED_IMAGE_TABLE_OCR advisory, and anti-stub row guards strictly enforcing atomic cell-by-cell table row
-  preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of non-existent
-  rows/grades), Anti-Clause Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION
-  blocks un-translated raw English prose clauses), Reference Note Anti-Proliferation Gate & Auto-Suppression Engine (EXCESSIVE_REF_NOTE_PROLIFERATION
+  preservation without summarization), Table Hallucination Gate (UNGROUNDED_TABLE_ROW_CONTENT prevents parametric memory hallucination of non-existent rows/grades), Anti-Clause & Strict Anti-Glossary Gates (PARENTHETICAL_CLAUSE_VIOLATION restricts parenthetical English to <= 4 words; UNPROCESSED_ENGLISH_CLAUSE_VIOLATION blocks un-translated raw English prose clauses; UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION strictly prevents subagents from parenthesizing routine English prose words like '(Define)', '(Older age)', '(Smoking)' to cheat recall validation),
+  Publication-Grade A4 Narrow & TwistedLines2 Page Layout Engine (enforces standard A4 geometry 11906x16838 dxa, 0.5-inch Narrow margins, and twistedLines2 decorative borders across all pages with --no-page-border CLI support),
+  Hybrid Cross-Lingual Recall Denominator Engine (filters routine academic verbs/descriptors from recall denominator while rewarding natural Persian translations of clinical and GI concepts), Reference Note Anti-Proliferation Gate & Auto-Suppression Engine (EXCESSIVE_REF_NOTE_PROLIFERATION
   restricts supplementary notes strictly to skipped or sparse-lecture slides <30-40 words), Universal Reference Note Sanitization & Anti-Dual-Prepending
   Engine (sanitize_ref_note & DUPLICATE_REF_TITLE_PREFIX advisory), Substantive Medical Concept Denominator Filtering (filters routine English prose
   verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG
@@ -42,7 +42,7 @@ description: >-
   in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.8.7)
+# Medical Lecture Transcriber & Study Guide Generator (v5.9.0)
 
 ## Overview
 
@@ -139,7 +139,14 @@ Medical study guides require 100% verifiable source provenance. Students must im
      - `سیناکلست (Cinacalcet)`
      - `پاراتورمون (PTH)`
    - **منع مطلق کپی جملات یا عبارات کامل (Anti-Clause Violation):** کپی کردن جملات انگلیسی، سطرها، یا بندهای دارای فعل/حرف‌ربط (مانند `(When the calcium level is >13 mg/dL...)` یا `(cannot provide enough capacity to replace losses)`) در داخل پرانتز یا متن بالت **اکیداً ممنوع** است و توسط گیت با خطای سخت `PARENTHETICAL_CLAUSE_VIOLATION` مسدود می‌شود.
-   - **فرمول مخرج کسر در گیت انطباق:** مخرج کسر گیت ریکال (Cross-Lingual Concept Recall) به صورت خودکار کلمات عمومی، افعال و قیدهای روتین زبان انگلیسی (مانند `provide`, `replace`, `cannot`, `enough`, `losses`, `under`, `circumstances`, `directed`) را فیلتر کرده و تنها مفاهیم اصیل پزشکی، فرمول‌ها، دوزها و اختصارات را ارزیابی می‌کند. بنابراین مترجم بدون نیاز به درج عبارات انگلیسی در پرانتز، با ترجمه سلیس فارسی حدنصاب ۵۰٪ را احراز می‌کند.
+   - **فرمول مخرج کسر در گیت انطباق:** مخرج کسر گیت ریکال (Cross-Lingual Concept Recall) به صورت خودکار کلمات عمومی، افعال و قیدهای روتین زبان انگلیسی (مانند `provide`, `replace`, `cannot`, `enough`, `losses`, `under`, `circumstances`, `directed`) را فیلتر کرده و تنها مفاهیم اصیل پزشکی، فرمول‌ها، دوزها و اختصارات را ارزیابی می‌کند. بنابراین مترجم بدون نیاز به درج عبارات انگلیسی در پرانتز، با ترجمه سلیس فارسی حدنصاب بازخوانی مفهومی را احراز می‌کند.
+   - **قانون منع پرانتزگذاری واژگان عمومی (Anti-Parenthetical Glossary Gate):**
+     پرانتزگذاری واژگان و افعال عادی انگلیسی (مانند `تعریف (Define)`، `سن بالا (Older age)`، `مصرف دخانیات (Smoking)`، `معده یا دوازدهه (Stomach or duodenum)`، `آزمایش مناسب (Appropriate testing)`) جهت پاس کردن مکانیکی گیت Recall **اکیداً ممنوع** بوده و توسط گیت با خطای سخت `UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION` مسدود می‌شود. پرانتز انگلیسی در کادرهای اسلاید **تنها برای موارد زیر مجاز است:**
+     1. سرواژه‌های رسمی پزشکی و بالینی (مانند `PUD`, `GERD`, `PPI`, `EGD`, `UBT`, `NSAIDs`, `HbA1c`, ...)
+     2. اسامی علمی پاتوژن‌ها و داروهای ژنریک استاندارد (مانند `H. pylori`, `Omeprazole`, `Amoxicillin`)
+     3. مقادیر، دوزها، واحدها، استیج‌ها و رده‌های بالینی (مانند `> 55`, `10 mg`, `35-year-old`, `Grade A`, `0.5-2%`, `5 in 10,000`)
+   - **استاندارد صفحه‌آرایی اختصاصی A4 باریک و کادر تزیینی (Page Setup Specification):**
+     موتور کامپایلر Word (`create_slide_pamphlet.py`) کلیه اسناد را به صورت پیش‌فرض با قطع استاندارد A4 (ابعاد ۱۱۹۰۶ در ۱۶۸۳۸ dxa معادل `w:code="9"` یا 210mm x 297mm)، حاشیه‌های باریک Narrow (نیم اینچ / ۷۲۰ dxa از هر ۴ طرف و هدر/فوتر) و کادر تزیینی رسمی `twistedLines2` با ضخامت `sz="10"` و فاصله `space="10"` از لبه صفحه تولید می‌نماید. در صورت نیاز به نسخه بدون کادر، فلگ خط فرمان `--no-page-border` پشتیبانی می‌شود.
 
 ---
 

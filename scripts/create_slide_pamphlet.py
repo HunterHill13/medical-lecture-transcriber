@@ -991,7 +991,44 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
             set_p_rtl(p, space_before=2.5, space_after=3.5, align_justify=True)
             add_formatted_bidi_text(p, block.get("text", ""), font_name="Dubai", size_pt=11, color_rgb=(0x26, 0x26, 0x26))
 
-def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جزوه جامع پزشکی", ref_book=None, img_dir=None, raw_slides_path=None):
+def apply_custom_page_setup(section, enable_border: bool = True):
+    """
+    Applies user-preferred A4 page size (11906 x 16838 dxa), Narrow margins (0.5 inch / 720 dxa),
+    and twistedLines2 decorative border to the document section.
+    """
+    from docx.shared import Inches
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+
+    # 1. Page Size (A4: 210mm x 297mm -> 11906 x 16838 dxa)
+    section.page_width = Inches(8.27)
+    section.page_height = Inches(11.69)
+
+    # 2. Narrow Margins (0.5 inch / 720 dxa from all sides)
+    section.top_margin = Inches(0.5)
+    section.bottom_margin = Inches(0.5)
+    section.left_margin = Inches(0.5)
+    section.right_margin = Inches(0.5)
+    section.header_distance = Inches(0.5)
+    section.footer_distance = Inches(0.5)
+
+    # 3. Decorative Border (twistedLines2)
+    if enable_border:
+        borders_xml = parse_xml(
+            f'<w:pgBorders {nsdecls("w")} w:offsetFrom="page">'
+            f'  <w:top w:val="twistedLines2" w:sz="10" w:space="10" w:color="auto"/>'
+            f'  <w:left w:val="twistedLines2" w:sz="10" w:space="10" w:color="auto"/>'
+            f'  <w:bottom w:val="twistedLines2" w:sz="10" w:space="10" w:color="auto"/>'
+            f'  <w:right w:val="twistedLines2" w:sz="10" w:space="10" w:color="auto"/>'
+            f'</w:pgBorders>'
+        )
+        existing_borders = section._sectPr.find('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pgBorders')
+        if existing_borders is not None:
+            section._sectPr.remove(existing_borders)
+        section._sectPr.append(borders_xml)
+
+
+def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جزوه جامع پزشکی", ref_book=None, img_dir=None, raw_slides_path=None, no_page_border=False):
     if not os.path.isfile(translated_json_path):
         raise FileNotFoundError(f"Translated slides JSON file not found: '{translated_json_path}'")
     try:
@@ -1020,6 +1057,10 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
 
     doc = docx.Document()
     
+    # Apply user-standard A4 Narrow margins and twistedLines2 decorative page borders
+    for sec in doc.sections:
+        apply_custom_page_setup(sec, enable_border=not no_page_border)
+
     # Font availability verification
     if not check_font_availability("Dubai"):
         print("⚠️  هشدار فونت: فونت 'Dubai' روی سیستم شما شناسایی نشد. ممکن است نمایش فایل در Word از فونت جایگزین استفاده کند.")
@@ -1177,7 +1218,8 @@ if __name__ == "__main__":
     parser.add_argument("--ref-book", choices=["هاریسون", "برانوالد", "شوارتز", "نلسون", "ویلیامز", "رابینز", "کاتزونگ", "گایتون"], default=None, help="Reference book name")
     parser.add_argument("--img-dir", default="./slide_images", help="Slide images directory")
     parser.add_argument("--raw", default=None, help="Optional path to raw_slides.json for metadata inheritance")
+    parser.add_argument("--no-page-border", action="store_true", help="Disable twistedLines2 decorative page borders.")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     
     args = parser.parse_args()
-    build_pamphlet_from_json(args.translated, args.output, title=args.title, ref_book=args.ref_book, img_dir=args.img_dir, raw_slides_path=args.raw)
+    build_pamphlet_from_json(args.translated, args.output, title=args.title, ref_book=args.ref_book, img_dir=args.img_dir, raw_slides_path=args.raw, no_page_border=args.no_page_border)

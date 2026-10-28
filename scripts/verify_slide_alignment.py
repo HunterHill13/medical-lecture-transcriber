@@ -33,6 +33,7 @@ if SCRIPTS_DIR not in sys.path:
 from text_utils import (
     extract_tokens,
     extract_substantive_tokens,
+    is_allowed_parenthetical,
     is_ceremonial_slide,
     validate_cross_reference,
     normalize_for_matching,
@@ -867,6 +868,22 @@ def check_slide_pair(raw_item: dict, trans_item: dict, trans_db: dict = None, al
                                     f"academic translation; English is strictly restricted to concise proper names, drug names, and medical "
                                     f"entity acronyms (maximum 4-5 words, no verbs/clauses)."),
                         "remediation_action": "Remove English clause from parentheses and express the statement cleanly in Persian prose."
+                    })
+                elif not is_allowed_parenthetical(p_clean):
+                    issues.append({
+                        "type": "UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION",
+                        "error_type": "UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION",
+                        "severity": "error",
+                        "slide_number": num,
+                        "bullet_index": b_idx,
+                        "parenthetical_content": p_clean[:80],
+                        "word_count": len(en_words),
+                        "message": (f"UNPROCESSED ENGLISH GLOSSARY VIOLATION at Slide {num}, Bullet {b_idx}: Bullet contains "
+                                    f"un-translated routine English word or phrase in parentheses ('{p_clean[:60]}'). "
+                                    f"Slide boxes must contain fluent Persian academic prose. Parenthetical English is strictly "
+                                    f"restricted to clinical acronyms (e.g. PUD, GERD, PPI), official pharma interventions, "
+                                    f"pathogens (e.g. H. pylori), or clinical values. Translate words like define, age, smoking into Persian prose."),
+                        "remediation_action": "Remove English word from parentheses and translate cleanly into fluent Persian prose."
                     })
 
             # Check 3.3.1b: Unprocessed English Clause Violation (outside parentheses)

@@ -1885,7 +1885,7 @@ def test_duplicate_ref_title_prefix_triggers_non_blocking_advisory_and_auto_sani
             "title_fa": "فیزیولوژی قشر آدرنال",
             "bullets": [
                 {
-                    "lead": "تنظیم استروئیدها (Steroid regulation):",
+                    "lead": "تنظیم استروئیدها:",
                     "body": "سنتز و تنظیم هورمون‌های کورتیکواستروئیدی قشر آدرنال."
                 }
             ],
@@ -2194,3 +2194,117 @@ def test_verify_slide_alignment_flags_excessive_ref_note_proliferation(tmp_path)
     assert "EXCESSIVE_REF_NOTE_PROLIFERATION" in warn_types, (
         f"Expected EXCESSIVE_REF_NOTE_PROLIFERATION warning in {warn_types}"
     )
+
+
+def test_unprocessed_english_glossary_violation_triggers(tmp_path):
+    import json, subprocess
+    raw_slides = [{
+        "slide_number": 1,
+        "title": "Peptic Ulcer Disease",
+        "text_lines": ["Define: Mucosal defect in stomach or duodenum", "Older age, smoking"],
+        "has_tables": False
+    }]
+    trans_slides = [{
+        "slide_number": 1,
+        "title_fa": "بیماری پپتیک اولسر",
+        "title_en": "Peptic Ulcer Disease",
+        "bullets": [
+            {"lead": "تعریف (Define)", "text": "نقص مخاطی (Mucosal defect) در معده یا دوازدهه (Stomach or duodenum)"},
+            {"lead": "عوامل خطر", "text": "سن بالا (Older age) و مصرف دخانیات (Smoking)"}
+        ],
+        "spoken_lecture": "استاد درباره بیماری پپتیک اولسر و آسیب مخاطی معده توضیح داد."
+    }]
+    raw_path = tmp_path / "raw.json"
+    trans_path = tmp_path / "trans.json"
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+    trans_path.write_text(json.dumps(trans_slides), encoding="utf-8")
+
+    diag_file = tmp_path / "slide_alignment_report.json"
+    script = os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py")
+    res = subprocess.run(
+        [
+            sys.executable,
+            script,
+            "--raw",
+            str(raw_path),
+            "--translated",
+            str(trans_path),
+            "--diagnostic-json",
+            str(diag_file),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
+    assert res.returncode != 0
+    diag = json.loads(diag_file.read_text(encoding="utf-8"))
+    err_types = [e.get("error_type") for e in diag.get("errors", [])]
+    assert "UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION" in err_types
+
+
+def test_allowed_parenthetical_acronyms_pass(tmp_path):
+    import json, subprocess
+    raw_slides = [{
+        "slide_number": 1,
+        "title": "PUD Management",
+        "text_lines": ["First line therapy: PPI and antibiotics for H. pylori eradication", "Dose: 20 mg Omeprazole"],
+        "has_tables": False
+    }]
+    trans_slides = [{
+        "slide_number": 1,
+        "title_fa": "درمان بیماری پپتیک اولسر",
+        "title_en": "PUD Management",
+        "bullets": [
+            {"lead": "درمان خط اول", "text": "استفاده از مهارکننده‌های پمپ پروتون (PPI) و آنتی‌بیوتیک‌ها برای ریشه‌کنی (H. pylori)"},
+            {"lead": "دوز دارویی", "text": "تجویز امپرازول (20 mg) به صورت روزانه"}
+        ],
+        "spoken_lecture": "استاد درباره پروتکل استاندارد درمان و ریشه‌کنی اچ پیلوری توضیح دادند."
+    }]
+    raw_path = tmp_path / "raw.json"
+    trans_path = tmp_path / "trans.json"
+    raw_path.write_text(json.dumps(raw_slides), encoding="utf-8")
+    trans_path.write_text(json.dumps(trans_slides), encoding="utf-8")
+
+    diag_file = tmp_path / "slide_alignment_report.json"
+    script = os.path.join(SCRIPTS_DIR, "verify_slide_alignment.py")
+    res = subprocess.run(
+        [
+            sys.executable,
+            script,
+            "--raw",
+            str(raw_path),
+            "--translated",
+            str(trans_path),
+            "--diagnostic-json",
+            str(diag_file),
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8"
+    )
+    diag = json.loads(diag_file.read_text(encoding="utf-8"))
+    err_types = [e.get("error_type") for e in diag.get("errors", [])]
+    assert "UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION" not in err_types
+
+
+def test_custom_page_setup_applied_to_docx(tmp_path):
+    import docx
+    from create_slide_pamphlet import apply_custom_page_setup
+
+    doc = docx.Document()
+    sec = doc.sections[0]
+    apply_custom_page_setup(sec, enable_border=True)
+
+    # 1. Page Size (A4: 8.27 x 11.69 inches)
+    assert abs(sec.page_width.inches - 8.27) < 0.05
+    assert abs(sec.page_height.inches - 11.69) < 0.05
+
+    # 2. Narrow Margins (0.5 inch / 720 dxa)
+    assert abs(sec.top_margin.inches - 0.5) < 0.01
+    assert abs(sec.bottom_margin.inches - 0.5) < 0.01
+    assert abs(sec.left_margin.inches - 0.5) < 0.01
+    assert abs(sec.right_margin.inches - 0.5) < 0.01
+
+    # 3. Decorative Border (twistedLines2)
+    xml_str = sec._sectPr.xml
+    assert "twistedLines2" in xml_str

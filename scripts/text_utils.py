@@ -434,8 +434,45 @@ BILINGUAL_MEDICAL_CONCEPTS = {
     "biliary": {"صفراوی", "صفرا"},
     "bile": {"صفرا"},
     "gastric": {"معده", "معدی"},
-    "stomach": {"معده"},
+    "stomach": {"معده", "معدی"},
     "ulcer": {"زخم"},
+    "ulcers": {"زخم‌ها", "زخم"},
+    "peptic": {"پپتیک", "گوارشی"},
+    "duodenum": {"دوازدهه", "اثنی‌عشر", "اثنی عشر"},
+    "duodenal": {"دوازدهه", "اثنی‌عشر", "اثنی عشر"},
+    "mucosal": {"مخاطی", "مخاط"},
+    "mucosa": {"مخاط", "مخاطی"},
+    "defect": {"نقص", "ضایعه", "آسیب"},
+    "defects": {"نقایص", "ضایعات", "آسیب‌ها"},
+    "smoking": {"سیگار", "دخانیات", "استعمال دخانیات"},
+    "smoker": {"سیگاری", "مصرف‌کننده دخانیات"},
+    "smokers": {"سیگاری‌ها", "افراد سیگاری"},
+    "dyspepsia": {"سوء هاضمه", "سوءهاضمه", "دیس‌پپسی", "دیس پپسی"},
+    "bleeding": {"خونریزی", "خون‌ریزی"},
+    "hemorrhage": {"خونریزی", "خون‌ریزی"},
+    "perforation": {"سوراخ‌شدگی", "سوراخ شدگی", "پرفوراسیون", "پارگی"},
+    "obstruction": {"انسداد", "گرفتگی"},
+    "epigastric": {"اپی‌گاستر", "اپی گاستر", "رو دل", "بالای شکم"},
+    "eradication": {"ریشه‌کنی", "ریشه کنی", "پاکسازی"},
+    "recurrence": {"عود", "بازگشت"},
+    "healing": {"ترمیم", "بهبودی", "التیام"},
+    "endoscopy": {"آندوسکوپی", "اندوسکوپی"},
+    "biopsy": {"بیوپسی", "نمونه‌برداری", "نمونه برداری"},
+    "nausea": {"تهوع"},
+    "vomiting": {"استفراغ"},
+    "pud": {"pud", "زخم پپتیک", "زخم گوارشی"},
+    "gerd": {"gerd", "ریفلاکس", "رفلاکس", "بازگشت اسید"},
+    "ppi": {"ppi", "مهارکننده پمپ پروتون"},
+    "nsaids": {"nsaids", "nsaid", "ضدالتهاب غیر استروئیدی", "ضدالتهاب غیرکورتونی", "مسکن"},
+    "egd": {"egd", "آندوسکوپی", "اندوسکوپی"},
+    "ubt": {"ubt", "تست تنفسی اوره"},
+    "sat": {"sat", "آنتی ژن مدفوعی"},
+    "rut": {"rut", "تست سریع اوره‌آز"},
+    "fd": {"fd", "سوءهاضمه عملکردی"},
+    "zes": {"zes", "زولینگر الیسون", "زولینگر-الیسون"},
+    "maltoma": {"مالتوما", "maltoma"},
+    "helicobacter": {"هلیکوباکتر"},
+    "pylori": {"پیلوری"},
     "intestinal": {"روده‌ای", "روده"},
     "bowel": {"روده"},
     "colon": {"کولون", "روده"},
@@ -608,6 +645,17 @@ PERSIAN_PHARMA_INTERVENTIONS = {
     "هیدروکورتیزون": "hydrocortisone",
     "امپرازول": "omeprazole",
     "پانتوپرازول": "pantoprazole",
+    "لانسوپرازول": "lansoprazole",
+    "اسموپرازول": "esomeprazole",
+    "رابپرازول": "rabeprazole",
+    "کلاریترومایسین": "clarithromycin",
+    "آموکسی‌سیلین": "amoxicillin",
+    "مترونیدازول": "metronidazole",
+    "بیسموت": "bismuth",
+    "تتراسایکلین": "tetracycline",
+    "فاموتیدین": "famotidine",
+    "رانیتیدین": "ranitidine",
+    "سوکرالفیت": "sucralfate",
     "سفتریاکسون": "ceftriaxone",
     "وانکومایسین": "vancomycin",
     "مروپنم": "meropenem",
@@ -766,6 +814,16 @@ BILINGUAL_CONCEPT_PHRASES = {
     # Weight
     ("weight", "loss"): ["کاهش وزن", "افت وزن", "لاغری"],
     ("weight", "gain"): ["افزایش وزن", "چاقی"],
+    # Peptic & Upper GI
+    ("peptic", "ulcer"): ["زخم پپتیک", "زخم گوارشی", "زخم معده و دوازدهه"],
+    ("gastric", "ulcer"): ["زخم معده"],
+    ("duodenal", "ulcer"): ["زخم دوازدهه", "زخم اثنی عشر", "زخم اثنی‌عشر"],
+    ("older", "age"): ["سن بالا", "افزایش سن", "سنین بالا", "سنین بالاتر"],
+    ("risk", "factor"): ["عامل خطر", "فاکتور خطر", "عوامل خطر"],
+    ("risk", "factors"): ["عوامل خطر", "فاکتورهای خطر"],
+    ("mucosal", "defect"): ["نقص مخاطی", "ضایعه مخاطی"],
+    ("h.", "pylori"): ["هلیکوباکتر پیلوری", "هلیکوباکتر", "اچ پیلوری"],
+    ("helicobacter", "pylori"): ["هلیکوباکتر پیلوری", "هلیکوباکتر"],
     # Thyroid
     ("hyperthyroidism",): ["پرکاری تیروئید", "هیپرتیروئیدی", "تیروتوکسیکوز"],
     ("hypothyroidism",): ["کم کاری تیروئید", "هیپوتیروئیدی"],
@@ -1029,6 +1087,29 @@ ENGLISH_PROSE_STOPWORDS = {
     "country", "countries", "origin", "origins", "frequent", "frequently", "frequency",
     "population", "populations", "society", "societies", "world", "developed", "developing",
     "decade", "decades", "century", "centuries", "prevalence", "permanent", "transient",
+    # Routine Clinical Descriptors, Academic Verbs & Diagnostic Stopwords
+    "define", "defines", "defined", "defining", "definition", "definitions",
+    "older", "younger", "elderly", "aged", "age", "ages",
+    "appropriate", "appropriately", "inappropriate", "inappropriately",
+    "complication", "complications",
+    "management", "manage", "managed", "managing",
+    "treatment", "treatments", "treat", "treated", "treating",
+    "presentation", "presentations",
+    "finding", "findings",
+    "investigation", "investigations", "investigate", "investigated", "investigating",
+    "assessment", "assessments", "assess", "assessed", "assessing",
+    "evaluation", "evaluations",
+    "examination", "examinations", "exam", "exams",
+    "indication", "indications", "contraindication", "contraindications",
+    "factor", "factors", "risk", "risks",
+    "recommendation", "recommendations", "recommend", "recommended", "recommending",
+    "guideline", "guidelines",
+    "criteria", "criterion",
+    "approach", "approaches",
+    "history", "physical",
+    "major", "minor", "mild", "moderate", "severe",
+    "test", "tests", "testing", "tested",
+    "therapy", "therapies", "therapeutic",
     # Roman Numerals & List Enumerators
     "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"
 }
@@ -1067,6 +1148,86 @@ def extract_substantive_tokens(text_or_lines: Union[str, List[str]], max_stem_le
         # Preserve clinical/medical entities or domain acronyms
         substantive.add(tok)
     return substantive
+
+
+def is_allowed_parenthetical(p_str: str) -> bool:
+    """
+    Validates whether an English parenthetical substring within translated slide bullets
+    is an allowable clinical abbreviation, dosage/number, or specific medical entity,
+    or an un-translated routine English word (e.g. '(Define)', '(Older age)', '(Smoking)').
+    """
+    clean = p_str.strip()
+    if not clean:
+        return True
+
+    # 1. Pure numbers, units, ranges, clinical stages (e.g., '10 mg', '> 55', '35-year-old', 'Grade A', 'Stage 2', 'p < 0.05', '0.5-2%', '5 in 10,000')
+    if re.fullmatch(r'^(?:[><≤≥±~≈]?\s*\d+(?:\.\d+)?(?:\s*|\-)(?:mg|mcg|μg|g|kg|ml|l|mmhg|mmol|meq|iu|u|bpm|%|year-old|yo|h|min|sec|days?|weeks?|months?|years?)|\d+(?:\.\d+)?[\s\-]*(?:to|\-|–)[\s\-]*\d+(?:\.\d+)?%?|\d+\s+in\s+[\d,]+|\d+:\d+|p\s*[<>=><≤≥]\s*\d+(?:\.\d+)?|Grade\s+[A-Za-z0-9]+|Stage\s+[A-Za-z0-9]+|Type\s+[A-Za-z0-9]+|Class\s+[A-Za-z0-9]+|Score\s+[A-Za-z0-9]+|[IVXLCDM]+|[><≤≥±~≈]?\s*\d+(?:\.\d+)?)$', clean, re.IGNORECASE):
+        return True
+
+    en_words = re.findall(r'[A-Za-z0-9\.\-]+', clean)
+    if not en_words:
+        return True
+
+    # Common recognized acronyms and Latin binomials (case-insensitive set)
+    RECOGNIZED_ACRONYMS = {
+        "hba1c", "maltoma", "mrna", "trna", "rrna", "cd4", "cd8", "iga", "igg", "igm", "ige",
+        "h.pylori", "h. pylori", "e.coli", "e. coli", "c.difficile", "c. difficile",
+        "nsaids", "nsaid", "dmards", "snris", "ssris", "acei", "arbs", "ppis", "t3", "t4", "ft3", "ft4", "pth",
+        "pud", "gerd", "ppi", "egd", "ubt", "sat", "rut", "fd", "pds", "eps", "zes", "goo", "tca",
+        "avp", "dic", "siadh", "tsh", "acth", "men1", "men2", "copd", "cad", "chd", "ckd", "aki",
+        "dka", "hhs", "sle", "ra", "ibd", "uc", "cd", "nafld", "nash", "hcv", "hbv", "hiv"
+    }
+
+    # Routine prose words, verbs, descriptors that must NEVER be parenthesized in slide bullets
+    DISALLOWED_PROSE_WORDS = {
+        "define", "defines", "defined", "defining", "definition", "definitions",
+        "older", "younger", "elderly", "aged", "age", "ages",
+        "smoke", "smoking", "smoker", "smokers",
+        "appropriate", "appropriately", "inappropriate", "inappropriately",
+        "testing", "tested", "test", "tests",
+        "treatment", "treatments", "treat", "treated", "treating",
+        "management", "manage", "managed", "managing",
+        "complication", "complications",
+        "stomach", "duodenum", "duodenal", "mucosal", "mucosa", "defect", "defects",
+        "ulcer", "ulcers", "peptic", "gastric", "dyspepsia", "weight", "loss", "pain",
+        "bleeding", "hemorrhage", "perforation", "obstruction", "nausea", "vomiting",
+        "feature", "features", "finding", "findings", "risk", "risks", "factor", "factors",
+        "common", "commonly", "general", "generally", "typical", "atypical",
+        "initial", "initially", "subsequent", "subsequently", "presentation", "presentations",
+        "investigation", "investigations", "evaluation", "evaluations", "assessment", "assessments",
+        "examination", "examinations", "exam", "exams", "history", "physical",
+        "primary", "secondary", "tertiary", "acute", "chronic", "benign", "malignant"
+    }
+
+    # If any word in the parenthetical is a known disallowed prose word, fail immediately
+    for w in en_words:
+        w_lower = w.lower().strip('.')
+        if w_lower in DISALLOWED_PROSE_WORDS:
+            return False
+
+    # Check each word against allowed categories
+    for w in en_words:
+        w_lower = w.lower().strip('.')
+        if not re.search(r'[A-Za-z]', w):
+            continue
+        if w_lower in RECOGNIZED_ACRONYMS or clean.lower() in RECOGNIZED_ACRONYMS:
+            continue
+        # Standard UPPERCASE acronym (2+ uppercase characters, e.g. PUD, GERD, PPI, ACTH, MEN1)
+        if re.fullmatch(r'^[A-Z0-9\+\-]{2,10}$', w):
+            continue
+        # Recognized gene symbol
+        if re.fullmatch(r'^[A-Z0-9]{2,8}$', w) or w in {"Ret", "Ras", "Myc", "Fos", "Jun"}:
+            continue
+        # Approved pharmacological drug or specific entity in dictionary
+        if (w_lower in PERSIAN_PHARMA_INTERVENTIONS or 
+            w_lower in PERSIAN_PHARMA_INTERVENTIONS.values() or 
+            w_lower in UNIFIED_SPECIFIC_MEDICAL_TERMS or 
+            w_lower in SPECIFIC_MEDICAL_TERMS):
+            continue
+        # If it doesn't match any allowed category, it's unapproved English prose!
+        return False
+
+    return True
 
 
 def evaluate_concept_overlap(raw_tokens: Set[str], trans_tokens: Set[str], trans_text: str) -> Set[str]:
@@ -1118,6 +1279,18 @@ for en_term, fa_tokens in UNIFIED_SPECIFIC_MEDICAL_TERMS.items():
             EXPANDED_BILINGUAL_EN_TO_FA[et] = set()
         EXPANDED_BILINGUAL_EN_TO_FA[et].update(val_fa_toks)
     for ft in val_fa_toks:
+        if ft not in EXPANDED_BILINGUAL_FA_TO_EN:
+            EXPANDED_BILINGUAL_FA_TO_EN[ft] = set()
+        EXPANDED_BILINGUAL_FA_TO_EN[ft].update(en_toks)
+
+for fa_drug, en_drug in PERSIAN_PHARMA_INTERVENTIONS.items():
+    fa_toks = extract_tokens([fa_drug])
+    en_toks = extract_tokens([en_drug])
+    for et in en_toks:
+        if et not in EXPANDED_BILINGUAL_EN_TO_FA:
+            EXPANDED_BILINGUAL_EN_TO_FA[et] = set()
+        EXPANDED_BILINGUAL_EN_TO_FA[et].update(fa_toks)
+    for ft in fa_toks:
         if ft not in EXPANDED_BILINGUAL_FA_TO_EN:
             EXPANDED_BILINGUAL_FA_TO_EN[ft] = set()
         EXPANDED_BILINGUAL_FA_TO_EN[ft].update(en_toks)
