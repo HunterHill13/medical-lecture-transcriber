@@ -2495,3 +2495,162 @@ def test_spoken_lecture_emerald_lead_and_antiglossary_rendering(tmp_path):
     assert len(emerald_runs) >= 2, f"Expected at least 2 emerald green leads, found: {emerald_runs}"
     assert any("۱. سد پیشاپیتلیال:" in r for r in emerald_runs), f"Missing numbered emerald lead in {emerald_runs}"
     assert any("🚨 علائم هشدار:" in r for r in emerald_runs), f"Missing emoji emerald lead in {emerald_runs}"
+
+
+def test_liver_substantive_recall_and_anatomy_overlap():
+    """
+    Regression Test (Session Report Problem 1):
+    Verifies that anatomical terms like 'liver' (کبد), 'adult' (بالغ), 'normal' (طبیعی),
+    'weighs' (وزن), 'gm' (گرم) are actively evaluated and recall correctly, achieving >= 50%
+    substantive recall without triggering SLIDE_SUBSTANTIVE_RECALL_DEFICIENCY.
+    """
+    from text_utils import extract_tokens, evaluate_concept_overlap
+    from verify_slide_alignment import check_slide_pair
+
+    raw_slide = {
+        "slide_number": 4,
+        "title_raw": "Liver Anatomy and Weight",
+        "text_lines": ["The normal adult liver weighs 1400 to 1600 gm"],
+        "ocr_text_lines": []
+    }
+
+    trans_slide = {
+        "slide_number": 4,
+        "title_fa": "آناتومی و وزن کبد",
+        "title_en": "Liver Anatomy and Weight",
+        "bullets": [
+            {"lead": "وزن طبیعی:", "text": "وزن کبد در افراد بالغ و طبیعی بین ۱۴۰۰ تا ۱۶۰۰ گرم است."}
+        ]
+    }
+
+    raw_toks = extract_tokens(raw_slide["text_lines"])
+    trans_toks = extract_tokens([b["lead"] + " " + b["text"] for b in trans_slide["bullets"]])
+    common = evaluate_concept_overlap(raw_toks, trans_toks, trans_slide["bullets"][0]["text"])
+
+    recall_ratio = len(common) / len(raw_toks)
+    assert recall_ratio >= 0.50, f"Expected recall >= 50%, got {recall_ratio:.1%} on raw tokens: {raw_toks}, common: {common}"
+
+    issues = check_slide_pair(raw_slide, trans_slide)
+    recall_issues = [i for i in issues if i.get("type") == "SLIDE_SUBSTANTIVE_RECALL_DEFICIENCY"]
+    assert len(recall_issues) == 0, f"Unexpected recall deficiency: {recall_issues}"
+
+
+def test_eponyms_and_serology_allowed_in_parentheses():
+    """
+    Regression Test (Session Report Problem 1):
+    Verifies that anatomical eponyms (Space of Disse, Canal of Hering, Portal vein, Kupffer cells),
+    mixed-case serology markers (HBsAg, Anti-HBc, Anti-HBs), and measurement ranges with units (1400-1600 g)
+    are permitted inside parentheses without triggering UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION.
+    """
+    from text_utils import is_allowed_parenthetical
+    from verify_slide_alignment import check_slide_pair
+
+    valid_parentheticals = [
+        "Portal vein",
+        "Space of Disse",
+        "Canal of Hering",
+        "Kupffer cells",
+        "HBsAg",
+        "Anti-HBc",
+        "Anti-HBs",
+        "HBeAg",
+        "Anti-HCV",
+        "1400-1600 g",
+        "1400 to 1600 gm",
+        "1400-1600 gm"
+    ]
+
+    for p in valid_parentheticals:
+        assert is_allowed_parenthetical(p), f"is_allowed_parenthetical failed for valid term: '{p}'"
+
+    raw_slide = {
+        "slide_number": 15,
+        "title_raw": "Hepatic Microcirculation and Viral Serology",
+        "text_lines": [
+            "Blood enters via Portal vein and hepatic artery",
+            "Exchange occurs in Space of Disse and Canal of Hering",
+            "Kupffer cells clear antigens",
+            "Serologic evaluation includes HBsAg and Anti-HBc"
+        ],
+        "ocr_text_lines": []
+    }
+
+    trans_slide = {
+        "slide_number": 15,
+        "title_fa": "میکروسیرکولاسیون کبدی و سرولوژی ویروسی",
+        "title_en": "Hepatic Microcirculation and Viral Serology",
+        "bullets": [
+            {"lead": "خونرسانی پورت:", "text": "خون از طریق ورید پورت (Portal vein) و شریان کبدی وارد کبد می‌شود."},
+            {"lead": "فضای دیس و هرینگ:", "text": "تبادلات سلولی در فضای دیس (Space of Disse) و کانال هرینگ (Canal of Hering) انجام می‌گیرد."},
+            {"lead": "سلول‌های کوپفر:", "text": "سلول‌های کوپفر (Kupffer cells) وظیفه پاکسازی آنتی‌ژن‌ها را بر عهده دارند."},
+            {"lead": "نشانگرهای هپاتیت:", "text": "ارزیابی سرولوژیک شامل آنتی‌ژن سطحی (HBsAg) و آنتی‌بادی هسته (Anti-HBc) است."}
+        ]
+    }
+
+    issues = check_slide_pair(raw_slide, trans_slide)
+    glossary_violations = [i for i in issues if i.get("type") == "UNPROCESSED_ENGLISH_GLOSSARY_VIOLATION"]
+    assert len(glossary_violations) == 0, f"Unexpected glossary violations: {glossary_violations}"
+
+
+def test_single_bullet_text_slide_suppresses_full_screenshot(tmp_path):
+    """
+    Regression Test (Session Report Problem 2):
+    Verifies that a text slide with only 1 bullet (num_bullets == 1) does NOT embed
+    the full-page slide screenshot, ensuring pure text slides remain screenshot-free.
+    """
+    import docx
+    import json
+    from create_slide_pamphlet import build_pamphlet_from_json
+
+    img_dir = tmp_path / "slide_images"
+    img_dir.mkdir()
+    # Create dummy full slide screenshot: slide_04.png
+    from PIL import Image
+    im = Image.new("RGB", (200, 150), color="white")
+    im.save(str(img_dir / "slide_04.png"))
+
+    raw_path = tmp_path / "raw_slides.json"
+    trans_path = tmp_path / "translated_slides.json"
+    out_docx = tmp_path / "pamphlet.docx"
+
+    raw_slides = [
+        {
+            "slide_number": 4,
+            "title_raw": "Liver Weight",
+            "text_lines": ["The normal adult liver weighs 1400 to 1600 gm"],
+            "has_tables": False,
+            "has_charts": False,
+            "is_pure_visual": False
+        }
+    ]
+    raw_path.write_text(json.dumps(raw_slides, ensure_ascii=False), encoding="utf-8")
+
+    trans_slides = [
+        {
+            "slide_number": 4,
+            "title_en": "Liver Weight",
+            "title_fa": "وزن طبیعی کبد",
+            "bullets": [
+                {"lead": "وزن کبد:", "text": "وزن کبد در افراد بالغ طبیعی بین ۱۴۰۰ تا ۱۶۰۰ گرم است."}
+            ],
+            "has_tables": False,
+            "has_charts": False,
+            "is_pure_visual": False
+        }
+    ]
+    trans_path.write_text(json.dumps(trans_slides, ensure_ascii=False), encoding="utf-8")
+
+    build_pamphlet_from_json(
+        str(trans_path),
+        str(out_docx),
+        title="پاتولوژی کبد",
+        img_dir=str(img_dir),
+        raw_slides_path=str(raw_path)
+    )
+
+    doc = docx.Document(str(out_docx))
+    # Check that NO inline shapes / pictures are embedded in the slide table cell
+    tbl = doc.tables[0]
+    cell1 = tbl.cell(1, 0)
+    xml_cell = cell1._tc.xml
+    assert "<w:drawing" not in xml_cell, "Single-bullet text slide must NOT embed full-page slide screenshot!"

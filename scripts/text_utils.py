@@ -428,6 +428,45 @@ BILINGUAL_MEDICAL_CONCEPTS = {
     # Gastrointestinal & Hepatic
     "hepatic": {"کبد", "کبدی", "هپاتیک"},
     "liver": {"کبد", "کبدی"},
+    "adult": {"بالغ", "بزرگسال", "بزرگسالان"},
+    "normal": {"طبیعی", "نرمال"},
+    "weight": {"وزن"},
+    "weighs": {"وزن", "دارد"},
+    "weigh": {"وزن"},
+    "gm": {"گرم", "g", "gm"},
+    "g": {"گرم", "g"},
+    "gram": {"گرم"},
+    "grams": {"گرم"},
+    "adjacent": {"مجاور", "همجوار", "نزدیک"},
+    "lost": {"از دست رفته", "تخریب", "نابودی"},
+    "divides": {"تقسیم", "انشعاب"},
+    "centered": {"مرکزی", "مرکز"},
+    "periphery": {"محیطی", "پیرامون", "حاشیه"},
+    "closest": {"نزدیک‌ترین", "نزدیکتر", "مجاور"},
+    "farthest": {"دورترین", "دورتر"},
+    "portal": {"پورت", "پورتال", "ورید پورت"},
+    "vein": {"ورید", "سیاهرگ"},
+    "veins": {"وریدها", "سیاهرگ‌ها"},
+    "artery": {"شریان", "سرخرگ"},
+    "arteries": {"شریان‌ها", "سرخرگ‌ها"},
+    "duct": {"مجرا", "کانال"},
+    "ducts": {"مجاری", "مجرها"},
+    "lobule": {"لوبول", "لوبولار"},
+    "lobules": {"لوبول‌ها"},
+    "acinus": {"آسینوس", "آسینار"},
+    "acini": {"آسینوس‌ها", "آسینی"},
+    "hepatocyte": {"هپاتوسیت", "سلول کبدی", "هپاتوسیت‌ها"},
+    "hepatocytes": {"هپاتوسیت‌ها", "هپاتوسیت", "سلول‌های کبدی"},
+    "sinusoid": {"سینوزوئید", "سینوزوئیدها", "سینوسوئید"},
+    "sinusoids": {"سینوزوئیدها", "سینوسوئید"},
+    "regeneration": {"بازسازی", "ترمیم", "تکثیر"},
+    "necrosis": {"نکروز", "بافت‌مردگی"},
+    "apoptosis": {"آپوپتوز", "مرگ برنامه‌ریزی‌شده"},
+    "inflammation": {"التهاب"},
+    "fibrosis": {"فیبروز"},
+    "steatosis": {"استئاتوز", "کبد چرب"},
+    "cholestasis": {"کلستاز", "ایست صفرا"},
+    "proliferation": {"تکثیر", "رشد"},
     "cirrhosis": {"سیروز"},
     "hepatitis": {"هپاتیت", "التهاب", "کبد"},
     "jaundice": {"یرقان", "زردی"},
@@ -831,8 +870,8 @@ PERSIAN_PHARMA_INTERVENTIONS.update(_norm_pharma)
 
 # Generic Persian words that CANNOT by themselves count as sufficient evidence for medical concepts
 GENERIC_PERSIAN_WORDS = {
-    "کاهش", "افزایش", "فشار", "قلب", "کبد", "تیروئید", "کلیه", "معده", "ریه",
-    "خون", "مغز", "بالا", "پایین", "زیاد", "کم", "درد", "بیماری", "بیمار",
+    "کاهش", "افزایش", "فشار", "تیروئید",
+    "بالا", "پایین", "زیاد", "کم", "درد", "بیماری", "بیمار",
     "سطح", "سطوح", "میزان", "علامت", "عامل", "خطر", "شدید", "خفیف", "متوسط"
 }
 
@@ -846,6 +885,16 @@ BILINGUAL_CONCEPT_PHRASES = {
     # Weight
     ("weight", "loss"): ["کاهش وزن", "افت وزن", "لاغری"],
     ("weight", "gain"): ["افزایش وزن", "چاقی"],
+    # Anatomy, Liver & Pathology
+    ("portal", "vein"): ["ورید پورت", "سیاهرگ باب", "ورید باب"],
+    ("hepatic", "artery"): ["شریان کبدی", "سرخرگ کبدی"],
+    ("bile", "duct"): ["مجرای صفراوی", "مجرای صفرا", "مجاری صفراوی"],
+    ("portal", "triad"): ["تریاد پورت", "سه‌گانه پورت"],
+    ("space", "of", "disse"): ["فضای دیس"],
+    ("canal", "of", "hering"): ["کانال هرینگ", "مجرای هرینگ"],
+    ("central", "vein"): ["ورید مرکزی", "سیاهرگ مرکزی"],
+    ("kupffer", "cells"): ["سلول‌های کوپفر", "سلول کوپفر"],
+    ("kupffer", "cell"): ["سلول کوپفر", "سلول‌های کوپفر"],
     # Peptic & Upper GI
     ("peptic", "ulcer"): ["زخم پپتیک", "زخم گوارشی", "زخم معده و دوازدهه"],
     ("gastric", "ulcer"): ["زخم معده"],
@@ -1193,7 +1242,9 @@ ALLOWED_CLINICAL_ACRONYMS = {
     "cox-1", "cox-2", "cox1", "cox2", "pcab", "p-cab", "dapt", "bid", "qid", "tid", "otc",
     "gej", "z-line", "dst", "ogtt", "bap", "dhea", "dheas", "shbg", "fsh", "lh", "prl", "gh",
     "igf-1", "igf1", "gnrh", "crh", "trh", "cbc", "bun", "cr", "alt", "ast", "ldl", "hdl",
-    "ecg", "ekg", "cxr", "ct", "mri", "us", "pet"
+    "ecg", "ekg", "cxr", "ct", "mri", "us", "pet",
+    "hbsag", "anti-hbc", "anti-hbs", "hbeag", "anti-hbe", "hbcag", "anti-hcv", "anti-hav", "anti-hdv", "anti-hev",
+    "hbs", "hbc", "hbe", "mirna", "sirna", "cd20", "cd3", "tnf-a", "tnf-alpha", "il-1", "il-6"
 }
 RECOGNIZED_ACRONYMS = ALLOWED_CLINICAL_ACRONYMS
 
@@ -1220,18 +1271,38 @@ DISALLOWED_PROSE_WORDS = {
 }
 
 
+EPONYM_ANATOMICAL_PATTERN = re.compile(
+    r"""^[A-Z][a-z]+(?:'[a-z]+)?(?:\s+(?:of|and|the|de|la|von)\s+[A-Z][a-z]+(?:'[a-z]+)?|\s+[A-Z][a-z]+(?:'[a-z]+)?|\s+(?:cells?|veins?|arter(?:y|ies)|ducts?|zones?|tracts?|spaces?|canals?|sinusoids?|lobules?|cords?|plates?|patches?|rings?|nodes?|folds?|complex(?:es)?|system|syndrome|barrier|triad|sheath|body|bodies|corpuscle|corpuscles|fiber|fibers))*$"""
+)
+
+MEASUREMENT_RANGE_PATTERN = re.compile(
+    r'^(?:[><≤≥±~≈]?\s*\d+(?:\.\d+)?(?:\s*(?:to|\-|–)\s*\d+(?:\.\d+)?)?\s*(?:mg|mcg|μg|g|gm|kg|ml|l|mmhg|mmol|meq|iu|u|bpm|%|cm|mm|yo|year-old|years?|months?|days?|hours?|h|min|sec)|\d+\s+in\s+[\d,]+|\d+:\d+|p\s*[<>=><≤≥]\s*\d+(?:\.\d+)?|Grade\s+[A-Za-z0-9]+|Stage\s+[A-Za-z0-9]+|Type\s+[A-Za-z0-9]+|Class\s+[A-Za-z0-9]+|Score\s+[A-Za-z0-9]+|[IVXLCDM]+|[><≤≥±~≈]?\s*\d+(?:\.\d+)?)$',
+    re.IGNORECASE
+)
+
+SEROLOGY_ACRONYM_PATTERN = re.compile(
+    r'^(?:Anti\-)?[A-Za-z0-9\+\-]{2,12}$'
+)
+
+
 def is_allowed_parenthetical(p_str: str) -> bool:
     """
     Validates whether an English parenthetical substring within translated slide bullets
     or lecture narrative is an allowable clinical abbreviation, dosage/number, or specific medical entity,
     or an un-translated routine English word (e.g. '(Define)', '(Older age)', '(Smoking)').
+    
+    Supports:
+    1. Numerical measurement ranges and units (e.g. '1400-1600 g', '1400 to 1600 gm', '10 mg', '0.5-2%')
+    2. Medical eponyms and proper anatomical noun phrases (e.g. 'Space of Disse', 'Canal of Hering', 'Portal vein', 'Kupffer cells')
+    3. Mixed-case serological and viral acronyms (e.g. 'HBsAg', 'Anti-HBc', 'Anti-HBs', 'HBeAg', 'Anti-HCV', 'mRNA', 'IgG')
+    4. Approved pharmacological agents and medical dictionary entities
     """
     clean = p_str.strip()
     if not clean:
         return True
 
-    # 1. Pure numbers, units, ranges, clinical stages (e.g., '10 mg', '> 55', '35-year-old', 'Grade A', 'Stage 2', 'p < 0.05', '0.5-2%', '5 in 10,000')
-    if re.fullmatch(r'^(?:[><≤≥±~≈]?\s*\d+(?:\.\d+)?(?:\s*|\-)(?:mg|mcg|μg|g|kg|ml|l|mmhg|mmol|meq|iu|u|bpm|%|year-old|yo|h|min|sec|days?|weeks?|months?|years?)|\d+(?:\.\d+)?[\s\-]*(?:to|\-|–)[\s\-]*\d+(?:\.\d+)?%?|\d+\s+in\s+[\d,]+|\d+:\d+|p\s*[<>=><≤≥]\s*\d+(?:\.\d+)?|Grade\s+[A-Za-z0-9]+|Stage\s+[A-Za-z0-9]+|Type\s+[A-Za-z0-9]+|Class\s+[A-Za-z0-9]+|Score\s+[A-Za-z0-9]+|[IVXLCDM]+|[><≤≥±~≈]?\s*\d+(?:\.\d+)?)$', clean, re.IGNORECASE):
+    # 1. Pure numbers, units, ranges, clinical stages
+    if MEASUREMENT_RANGE_PATTERN.match(clean):
         return True
 
     en_words = re.findall(r'[A-Za-z0-9\.\-]+', clean)
@@ -1244,15 +1315,19 @@ def is_allowed_parenthetical(p_str: str) -> bool:
         if w_lower in DISALLOWED_PROSE_WORDS:
             return False
 
-    # Check each word against allowed categories
+    # 2. Medical eponyms and proper anatomical noun phrases (e.g. Space of Disse, Kupffer cells)
+    if EPONYM_ANATOMICAL_PATTERN.match(clean):
+        return True
+
+    # 3. Check each word against allowed categories
     for w in en_words:
         w_lower = w.lower().strip('.')
         if not re.search(r'[A-Za-z]', w):
             continue
         if w_lower in ALLOWED_CLINICAL_ACRONYMS or clean.lower() in ALLOWED_CLINICAL_ACRONYMS:
             continue
-        # Standard UPPERCASE acronym (2+ uppercase characters, e.g. PUD, GERD, PPI, ACTH, MEN1)
-        if re.fullmatch(r'^[A-Z0-9\+\-]{2,10}$', w):
+        # Mixed-case serology / viral / molecular acronyms (e.g. HBsAg, Anti-HBc, Anti-HBs, mRNA, CD4, PUD)
+        if SEROLOGY_ACRONYM_PATTERN.match(w) and (any(c.isupper() for c in w) or w.startswith('Anti-')):
             continue
         # Recognized gene symbol
         if re.fullmatch(r'^[A-Z0-9]{2,8}$', w) or w in {"Ret", "Ras", "Myc", "Fos", "Jun"}:

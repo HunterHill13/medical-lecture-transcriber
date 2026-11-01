@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.9.2): Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.9.3): Anatomical & Substantive Recall Engine (unblocks organs like کبد, قلب, کلیه from generic stopwords, expanding bilingual medical concept coverage to 350+ entries and ensuring pure Persian anatomical descriptions pass recall gates at >= 50%), Eponym & Mixed-Case Serology Parenthetical Validator (permits medical eponyms like Space of Disse, Canal of Hering, Kupffer cells, serology markers like HBsAg, Anti-HBc, and numerical ranges with units like 1400-1600 g without glossary violation), Single-Bullet Text Slide Screenshot Guard (suppresses full-page slide screenshot embedding on single-bullet text slides), Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
   Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
@@ -38,11 +38,11 @@ description: >-
   verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG
   for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Track 3
   Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping (validates
-  line citations), Unified Bilingual Medical Concept Engine (280+ clinical concepts & phrases), Visual-Aware OCR Triggering, Automated 173-Test Suite
+  line citations), Unified Bilingual Medical Concept Engine (280+ clinical concepts & phrases), Visual-Aware OCR Triggering, Automated 184-Test Suite
   in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.9.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.9.3)
 
 ## Overview
 

@@ -1203,8 +1203,9 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
         is_pure_vis = bool(slide.get("is_pure_visual") or slide.get("is_image_only") or slide_augmented.get("is_pure_visual"))
 
         # Smart Text Slide Screenshot Guard:
-        # A slide with substantive text (>= 2 bullets) without table/chart/pure-visual is pure text
-        is_text_heavy_slide = bool(num_bullets >= 2 and not has_table_content and not has_chart_content and not is_pure_vis)
+        # A slide with substantive text (>= 1 bullet or digital text lines) without table/chart/pure-visual is pure text
+        has_raw_text = bool(raw_item.get("text_lines") or raw_item.get("content_fa") or raw_item.get("content_en"))
+        is_text_slide = bool((num_bullets >= 1 or has_raw_text) and not has_table_content and not has_chart_content and not is_pure_vis)
 
         # 1. Search for standalone figures first (e.g. slide_05_fig.png)
         img_path = None
@@ -1214,7 +1215,7 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
         # 2. If no standalone figure found:
         if not img_path:
             # Fall back to full-page screenshot ONLY if the slide is NOT a pure text slide
-            if not is_text_heavy_slide:
+            if not is_text_slide:
                 explicit_img = slide.get("img_path") or raw_item.get("img_path")
                 if explicit_img and os.path.exists(explicit_img):
                     img_path = convert_image_to_png(explicit_img)
