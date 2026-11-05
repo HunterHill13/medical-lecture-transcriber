@@ -2654,3 +2654,120 @@ def test_single_bullet_text_slide_suppresses_full_screenshot(tmp_path):
     cell1 = tbl.cell(1, 0)
     xml_cell = cell1._tc.xml
     assert "<w:drawing" not in xml_cell, "Single-bullet text slide must NOT embed full-page slide screenshot!"
+
+
+def test_subtractive_synthesis_slide_first_rendering_and_silent_suppression(tmp_path):
+    """
+    Regression Test (v5.10.0 Architecture):
+    Verifies that Track 2 (Slide Box table) is rendered FIRST, followed by Track 1 (Spoken Lecture),
+    and that a slide with empty spoken_lecture has Track 1 silently suppressed.
+    """
+    import docx
+    import json
+    from create_slide_pamphlet import build_pamphlet_from_json
+
+    out_docx = tmp_path / "slide_first.docx"
+    trans_json = tmp_path / "translated_slides.json"
+
+    slides = [
+        {
+            "slide_number": 1,
+            "title_fa": "اسلاید اول با توضیح",
+            "title_en": "First Slide With Lecture",
+            "audio_time": "02:15",
+            "bullets": [
+                {"lead": "نکته اسلاید:", "text": "متن بالت اسلاید اول"}
+            ],
+            "spoken_lecture": "توضیح اختصاصی استاد برای اسلاید اول."
+        },
+        {
+            "slide_number": 2,
+            "title_fa": "اسلاید دوم بدون توضیح (روخوانی)",
+            "title_en": "Second Slide Slide-Reading Only",
+            "audio_time": "04:30",
+            "bullets": [
+                {"lead": "نکته اسلاید ۲:", "text": "متن بالت اسلاید دوم که استاد فقط روخوانی کرد"}
+            ],
+            "spoken_lecture": ""
+        }
+    ]
+    trans_json.write_text(json.dumps(slides, ensure_ascii=False), encoding="utf-8")
+
+    build_pamphlet_from_json(str(trans_json), str(out_docx), title="تست جانمایی اسلاید اول")
+
+    doc = docx.Document(str(out_docx))
+    
+    # 1. Slide 1 must have Table (Track 2) rendered before the lecture paragraph
+    # Inspect document body elements in document order
+    body_elements = []
+    for child in doc.element.body:
+        tag = child.tag.split("}")[-1]
+        if tag == "tbl":
+            body_elements.append("tbl")
+        elif tag == "p":
+            text = child.text or ""
+            if "توضیحات و نکات بالینی استاد:" in text:
+                body_elements.append("lecture_header")
+
+    # Table 0 is TOC table or slide table. Find first 'tbl' then 'lecture_header'
+    tbl_idx = body_elements.index("tbl")
+    lec_idx = body_elements.index("lecture_header")
+    assert tbl_idx < lec_idx, f"Slide table (idx {tbl_idx}) MUST precede lecture header (idx {lec_idx}) in document order!"
+
+    # 2. Slide 2 has empty spoken_lecture -> Exactly 1 lecture_header in entire document
+    lecture_headers = [e for e in body_elements if e == "lecture_header"]
+    assert len(lecture_headers) == 1, f"Expected exactly 1 lecture header (Slide 2 silently suppressed), got {len(lecture_headers)}"
+
+
+def test_egm_conceptual_union_coverage_gate_passes_concise_lecture():
+    """
+    Regression Test (v5.10.0 Architecture):
+    Verifies that evaluate_word_ratio_gate passes when union concept recall >= 75%
+    even if the spoken lecture word count is low (e.g. 20% of audio words).
+    """
+    from verify_lecture_alignment import evaluate_word_ratio_gate
+
+    # Lecture words = 200, Audio words = 1000 (Ratio = 20%, below legacy 50% threshold)
+    # But Union Concept Recall = 82% (Slide covered 62% + Lecture covered 20%)
+    passed, ratio, diag = evaluate_word_ratio_gate(
+        total_lecture_words=200,
+        total_trans_words=1000,
+        threshold=0.50,
+        union_recall_rate=0.82,
+        union_threshold=0.75
+    )
+    assert passed is True, "EGM Conceptual Union Gate MUST pass when union recall >= 75% even with low word ratio!"
+    assert diag is None
+
+
+def test_egm_subtractive_slide_reading_subsumed_pass():
+    """
+    Regression Test (v5.10.0 Architecture):
+    Verifies that a voiced slide where the professor read the slide bullets verbatim
+    and spoken_lecture is empty passes grounding without raising SLIDE_SPOKEN_LECTURE_EMPTY.
+    """
+    from verify_lecture_alignment import evaluate_slide_level_grounding
+
+    chunks = [
+        {
+            "start_sec": 0,
+            "end_sec": 45,
+            "text": "The normal adult liver weighs 1400 to 1600 grams."
+        }
+    ]
+    slides = [
+        {
+            "slide_number": 1,
+            "title_fa": "آناتومی کبد",
+            "title_en": "Liver Anatomy",
+            "audio_time_range": "00:00 - 00:45",
+            "bullets": [
+                {"lead": "وزن طبیعی:", "text": "وزن کبد در افراد بالغ طبیعی بین ۱۴۰۰ تا ۱۶۰۰ گرم است."}
+            ],
+            "spoken_lecture": ""  # Subtractive synthesis: slide reading pruned!
+        }
+    ]
+
+    issues, stats = evaluate_slide_level_grounding(slides, chunks)
+    empty_issues = [i for i in issues if i.get("type") == "SLIDE_SPOKEN_LECTURE_EMPTY"]
+    assert len(empty_issues) == 0, f"Subsumed slide reading must NOT raise SLIDE_SPOKEN_LECTURE_EMPTY: {empty_issues}"

@@ -45,6 +45,7 @@ from text_utils import (
     validate_cross_reference,
     extract_clinical_facts,
     compare_clinical_facts,
+    evaluate_concept_overlap,
     DEFAULT_CHUNK_LENGTH_SEC
 )
 
@@ -56,12 +57,17 @@ def compute_drift_threshold(duration_sec: int, strict: bool = False, max_drift: 
         return max(0, int(max_drift))
     return max(180, int(duration_sec * 0.05)) if duration_sec > 0 else 180
 
-def evaluate_word_ratio_gate(total_lecture_words: int, total_trans_words: int, threshold: float = 0.50):
+def evaluate_word_ratio_gate(total_lecture_words: int, total_trans_words: int, threshold: float = 0.50,
+                             union_recall_rate: Optional[float] = None, union_threshold: float = 0.75):
     """
-    Stage 1 Word Volume Ratio Gate (minimum 50%).
+    Stage 1 Word Volume Ratio Gate (minimum 50%) with EGM Subtractive Synthesis bypass:
+    If subtractive synthesis is active and union concept recall (Slide + Lecture) >= 75%,
+    the gate passes regardless of low spoken word count because concepts are covered on the slides.
     Returns: (passed: bool, word_ratio: float, error_detail: Optional[dict])
     """
     word_ratio = total_lecture_words / max(total_trans_words, 1)
+    if union_recall_rate is not None and union_recall_rate >= union_threshold:
+        return True, word_ratio, None
     if word_ratio < threshold:
         err_msg = (f"INSUFFICIENT LECTURE COVERAGE: Spoken lecture in study guide has {total_lecture_words} words, "
                    f"which is only {word_ratio*100:.1f}% of audio transcripts ({total_trans_words} words). "
@@ -71,6 +77,7 @@ def evaluate_word_ratio_gate(total_lecture_words: int, total_trans_words: int, t
             "total_spoken_words": total_lecture_words,
             "total_transcript_words": total_trans_words,
             "word_ratio": word_ratio,
+            "union_recall_rate": union_recall_rate,
             "message": err_msg,
             "remediation_action": "Expand spoken_lecture fields across slides to faithfully capture the professor's full verbal explanations without superficial summarization."
         }
@@ -559,11 +566,19 @@ def evaluate_slide_level_grounding(translated_slides: list, transcript_chunks: l
             spoken_text = flatten_spoken_lecture(parent_slide.get("spoken_lecture"))
         spoken_tokens = extract_tokens(spoken_text)
         
+        # Slide Content Tokens & Facts (EGM Subtractive Synthesis: Slide + Spoken Lecture)
+        slide_bullets_tokens = slide_text_tokens_map.get(num, set())
+        slide_bullets_substantive = {t for t in slide_bullets_tokens if len(t) >= 3 or (len(t) >= 2 and any(c.isascii() and c.isalpha() for c in t))}
+        
+        slide_text_for_facts = " ".join([b.get("lead", "") + " " + b.get("text", "") if isinstance(b, dict) else str(b) for b in s.get("bullets", [])])
+        slide_facts = extract_clinical_facts(slide_text_for_facts)
+        
         # Clinical Facts Audit (dosages, lab values, percentages)
         combined_candidate_text = " ".join(candidate_texts)
         audio_facts = extract_clinical_facts(combined_candidate_text)
-        spoken_facts = extract_clinical_facts(spoken_text)
-        fact_comp = compare_clinical_facts(audio_facts, spoken_facts)
+        covered_text_for_facts = (spoken_text or "") + " " + slide_text_for_facts
+        covered_facts = extract_clinical_facts(covered_text_for_facts)
+        fact_comp = compare_clinical_facts(audio_facts, covered_facts)
         stats["total_clinical_facts_evaluated"] += fact_comp["total_audio_facts"]
         
         crit_omissions = fact_comp.get("critical_omissions", [])
@@ -578,7 +593,7 @@ def evaluate_slide_level_grounding(translated_slides: list, transcript_chunks: l
                 "critical_omissions": crit_omissions,
                 "fact_recall": fact_comp["fact_recall"],
                 "message": (f"CRITICAL CLINICAL FACT OMISSION at Slide {num}: High-stakes dosages/lab values {crit_omissions} "
-                            f"mentioned in audio window were omitted from spoken_lecture text!"),
+                            f"mentioned in audio window were omitted from both slide bullets and spoken_lecture text!"),
                 "remediation_action": f"Incorporate vital clinical facts {crit_omissions} into Slide {num} spoken_lecture immediately."
             })
         if adv_omissions:
@@ -591,12 +606,13 @@ def evaluate_slide_level_grounding(translated_slides: list, transcript_chunks: l
                 "omitted_facts": adv_omissions[:5],
                 "fact_recall": fact_comp["fact_recall"],
                 "message": (f"POTENTIAL CLINICAL FACT OMISSION at Slide {num}: Audio window mentions {adv_omissions[:3]} "
-                            f"which were not detected in spoken_lecture text."),
+                            f"which were not detected in slide bullets or spoken_lecture text."),
                 "remediation_action": f"Verify whether {adv_omissions[:3]} should be explicitly incorporated into Slide {num} spoken_lecture."
             })
         
         spoken_substantive = {t for t in spoken_tokens if len(t) >= 3 or (len(t) >= 2 and any(c.isascii() and c.isalpha() for c in t))}
         candidate_substantive = {t for t in candidate_tokens if len(t) >= 3 or (len(t) >= 2 and any(c.isascii() and c.isalpha() for c in t))}
+        covered_substantive = spoken_substantive.union(slide_bullets_substantive)
         
         if not matched_segment_ids:
             stats["failed_slides"] += 1
@@ -628,28 +644,42 @@ def evaluate_slide_level_grounding(translated_slides: list, transcript_chunks: l
             })
             continue
 
+        slide_overlap = evaluate_concept_overlap(candidate_substantive, slide_bullets_substantive, slide_text_for_facts)
+        if not slide_overlap:
+            slide_overlap = slide_bullets_substantive.intersection(candidate_substantive)
+
+        spoken_overlap = spoken_substantive.intersection(candidate_substantive)
+        if not spoken_overlap and spoken_text:
+            spoken_overlap = evaluate_concept_overlap(candidate_substantive, spoken_substantive, spoken_text)
+        overlap = spoken_overlap.union(slide_overlap)
+
+        is_subsumed_by_slide = False
         if not spoken_substantive:
-            stats["failed_slides"] += 1
-            precisions.append(0.0)
-            recalls.append(0.0)
-            issues.append({
-                "type": "SLIDE_SPOKEN_LECTURE_EMPTY",
-                "severity": "error",
-                "slide_number": num,
-                "audio_time_range": f"{format_seconds_to_time(int(slide_start_sec))} - {format_seconds_to_time(int(slide_end_sec))}",
-                "message": (f"EMPTY SPOKEN LECTURE at Slide {num} ({format_seconds_to_time(int(slide_start_sec))} - {format_seconds_to_time(int(slide_end_sec))}): "
-                            f"Slide is voiced with {total_slide_dur:.1f}s of audio, but lacks substantive spoken_lecture transcription content."),
-                "remediation_action": f"Provide substantive spoken_lecture content for Slide {num}."
-            })
-            continue
-            
-        overlap = spoken_substantive.intersection(candidate_substantive)
+            # EGM Subtractive Synthesis: If the professor merely read the slide, candidate concepts are covered by slide bullets
+            if len(slide_overlap) >= 2 or (len(candidate_substantive) > 0 and len(slide_overlap) / len(candidate_substantive) >= 0.35):
+                is_subsumed_by_slide = True
+                stats["subsumed_slides"] = stats.get("subsumed_slides", 0) + 1
+            else:
+                stats["failed_slides"] += 1
+                precisions.append(0.0)
+                recalls.append(0.0)
+                issues.append({
+                    "type": "SLIDE_SPOKEN_LECTURE_EMPTY",
+                    "severity": "error",
+                    "slide_number": num,
+                    "audio_time_range": f"{format_seconds_to_time(int(slide_start_sec))} - {format_seconds_to_time(int(slide_end_sec))}",
+                    "message": (f"EMPTY SPOKEN LECTURE at Slide {num} ({format_seconds_to_time(int(slide_start_sec))} - {format_seconds_to_time(int(slide_end_sec))}): "
+                                f"Slide is voiced with {total_slide_dur:.1f}s of audio, but lacks substantive spoken_lecture transcription content."),
+                    "remediation_action": f"Provide substantive spoken_lecture content for Slide {num}."
+                })
+                continue
         
-        # 1. Lexical Precision (|Slide ∩ Segments| / |Slide|)
-        precision = len(overlap) / max(1, len(spoken_substantive))
+        # 1. Lexical Precision (|Covered ∩ Segments| / |Covered|)
+        eval_denom = spoken_substantive if spoken_substantive else slide_bullets_substantive
+        precision = len(overlap) / max(1, len(eval_denom))
         precisions.append(precision)
         
-        # 2. Pure Lexical Segment Recall (|Slide ∩ Segments| / |Segments Substantive|)
+        # 2. Pure Lexical Segment Recall (|Covered ∩ Segments| / |Segments Substantive|)
         recall_ratio = len(overlap) / max(1, len(candidate_substantive))
         recalls.append(recall_ratio)
 
@@ -1056,12 +1086,46 @@ def main():
     total_lecture_words = len(lecture_text.split())
     total_trans_words = sum(len(c["text"].split()) for c in transcript_chunks)
 
-    # Check 4: The Strict Two-Stage Anti-Omission & Concept Recall Gate
-    passed_w, word_ratio, w_diag = evaluate_word_ratio_gate(total_lecture_words, total_trans_words, threshold=0.50)
+    # Extract all slide tokens for EGM Conceptual Union Gate (Slide + Lecture)
+    total_slide_tokens = set()
+    if s_data:
+        for s in s_data:
+            if isinstance(s, dict):
+                for b in s.get("bullets", []):
+                    if isinstance(b, dict):
+                        total_slide_tokens.update(extract_tokens(b.get("lead", "") + " " + b.get("text", "")))
+                    elif isinstance(b, (list, tuple)):
+                        total_slide_tokens.update(extract_tokens(" ".join(str(x) for x in b)))
+                    else:
+                        total_slide_tokens.update(extract_tokens(str(b)))
+                tbl = s.get("table_data")
+                if tbl and isinstance(tbl, dict):
+                    for h in tbl.get("headers", []):
+                        total_slide_tokens.update(extract_tokens(str(h)))
+                    for row in tbl.get("rows", []):
+                        if isinstance(row, list):
+                            total_slide_tokens.update(extract_tokens(" ".join(str(c) for c in row)))
+                        elif isinstance(row, dict):
+                            total_slide_tokens.update(extract_tokens(" ".join(str(v) for v in row.values())))
+
+    all_chunk_tokens = set()
+    for c in transcript_chunks:
+        all_chunk_tokens.update(c.get("tokens", set()))
+    audio_substantive = {t for t in all_chunk_tokens if len(t) >= 3 or (len(t) >= 2 and any(c.isascii() and c.isalpha() for c in t))}
+    total_covered_tokens = set(total_lecture_tokens).union(total_slide_tokens)
+    union_covered = total_covered_tokens.intersection(audio_substantive)
+    union_recall_rate = len(union_covered) / max(1, len(audio_substantive))
+
+    # Check 4: The Strict Two-Stage Anti-Omission & Concept Recall Gate (with EGM Union Bypass)
+    passed_w, word_ratio, w_diag = evaluate_word_ratio_gate(
+        total_lecture_words, total_trans_words, threshold=0.50,
+        union_recall_rate=union_recall_rate, union_threshold=0.75
+    )
     print("\n" + "=" * 68)
-    print("📊 LECTURE COVERAGE & CONCEPT RECALL AUDIT")
+    print("📊 LECTURE COVERAGE & CONCEPT RECALL AUDIT (EGM SUBTRACTIVE UNION)")
     print(f"• Total Audio Transcript Words: {total_trans_words}")
-    print(f"• Total Spoken Lecture Words in Study Guide: {total_lecture_words} (Ratio: {word_ratio*100:.1f}%)")
+    print(f"• Total Spoken Lecture Words in Study Guide: {total_lecture_words} (Word Ratio: {word_ratio*100:.1f}%)")
+    print(f"• EGM Union Concept Recall (Slide + Lecture): {union_recall_rate*100:.1f}%")
     
     # Stage 1: Word Volume Ratio Check (Minimum 50%)
     if not passed_w:
@@ -1097,6 +1161,13 @@ def main():
                         s_time_sec = t_list[0]
                 if s_time_sec is not None and (chunk_st - 120) <= s_time_sec <= (chunk_en + 120):
                     local_text += " " + flatten_spoken_lecture(s.get("spoken_lecture", ""))
+                    for b in s.get("bullets", []):
+                        if isinstance(b, dict):
+                            local_text += " " + b.get("lead", "") + " " + b.get("text", "")
+                        elif isinstance(b, (list, tuple)):
+                            local_text += " " + " ".join(str(x) for x in b)
+                        else:
+                            local_text += " " + str(b)
                     
         local_target_tokens = extract_tokens(local_text) if local_text.strip() else total_lecture_tokens
         
@@ -1105,7 +1176,7 @@ def main():
         
         # If failed locally, check if concepts were displaced globally to a remote section
         if not passed_c:
-            passed_global, global_recall, global_missing = evaluate_concept_recall_gate(chunk["tokens"], total_lecture_tokens, threshold=0.60)
+            passed_global, global_recall, global_missing = evaluate_concept_recall_gate(chunk["tokens"], total_covered_tokens, threshold=0.60)
             if passed_global:
                 warn_msg = (f"TEMPORAL CONCEPT DISPLACEMENT in {chunk['file']} (time {format_seconds_to_time(chunk_st)} - {format_seconds_to_time(chunk_en)}): "
                             f"Concepts were covered ({global_recall*100:.1f}%), but placed in remote slides/sections rather than the corresponding audio timeframe! Missing locally: {missing_sample}")

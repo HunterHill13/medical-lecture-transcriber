@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.9.3): Anatomical & Substantive Recall Engine (unblocks organs like کبد, قلب, کلیه from generic stopwords, expanding bilingual medical concept coverage to 350+ entries and ensuring pure Persian anatomical descriptions pass recall gates at >= 50%), Eponym & Mixed-Case Serology Parenthetical Validator (permits medical eponyms like Space of Disse, Canal of Hering, Kupffer cells, serology markers like HBsAg, Anti-HBc, and numerical ranges with units like 1400-1600 g without glossary violation), Single-Bullet Text Slide Screenshot Guard (suppresses full-page slide screenshot embedding on single-bullet text slides), Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.10.0): Per-Slide Subtractive Spoken Lecture Synthesis & Slide-First Visual Flow (renders Slide Box Track 2 first, followed per-slide by unique verbal clinical explanations; silently suppresses Track 1 when professor merely reads slide), Slim Lecture Line Header (replaces bulky legacy banner with '🎙️ [⏱️XX:YY] توضیحات و نکات بالینی استاد:'), Strict Closed-World Zero-Hallucination Invariant (restricts synthesis strictly to audio transcripts and raw slides with zero external memory injection), EGM Conceptual Union Coverage Gate (replaces 50% word count gate with conceptual set union verifying that substantive audio concepts are accounted for by Slide Content OR Spoken Lecture), Anatomical & Substantive Recall Engine (unblocks organs like کبد, قلب, کلیه from generic stopwords, expanding bilingual medical concept coverage to 350+ entries and ensuring pure Persian anatomical descriptions pass recall gates at >= 50%), Eponym & Mixed-Case Serology Parenthetical Validator (permits medical eponyms like Space of Disse, Canal of Hering, Kupffer cells, serology markers like HBsAg, Anti-HBc, and numerical ranges with units like 1400-1600 g without glossary violation), Single-Bullet Text Slide Screenshot Guard (suppresses full-page slide screenshot embedding on single-bullet text slides), Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
   Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
@@ -38,11 +38,11 @@ description: >-
   verbs and demographic fillers from recall denominator), Universal Vector & Chart Rasterization Engine (converts WMF, EMF, SVG, WebP, TIFF to PNG
   for Word rendering & OCR), Automatic Raw Slide Visual & Table Metadata Inheritance, Visual Asset Presence Audit Gate (VISUAL_ASSET_AUDIT), Track 3
   Reference Note Separation (renders ref_note in dedicated callouts strictly outside Track 2 Slide Box), Semantic Source Provenance Mapping (validates
-  line citations), Unified Bilingual Medical Concept Engine (280+ clinical concepts & phrases), Visual-Aware OCR Triggering, Automated 184-Test Suite
+  line citations), Unified Bilingual Medical Concept Engine (280+ clinical concepts & phrases), Visual-Aware OCR Triggering, Automated 187-Test Suite
   in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.9.3)
+# Medical Lecture Transcriber & Study Guide Generator (v5.10.0)
 
 ## Overview
 
@@ -168,10 +168,11 @@ Whenever `{ref_book_name}` is referenced in titles or notes, substitute the appr
 ### C. Unified Slide-Anchored Spoken Architecture & Dual-Track Isolation (معماری ساختاریافته تدریس پیوسته موضعی)
 To eliminate any conflict between classroom lecture flow and slide translation fidelity, and to **guarantee that no spoken concept, clinical anecdote, or diagnostic nuance is lost**, all content is unified inside `translated_slides.json` and segregated into two clean, non-interfering tracks:
 
-1. **Track 1: متن تدریس کلاسی استاد (`spoken_lecture` در هر اسلاید):**
-   - **Slide-Anchored Spoken Flow:** سخنان استاد دقیقاً همراه با همان اسلایدی که در آن لحظه تدریس می‌شده جانمایی می‌شود (نه به صورت کلی‌گویی‌های مبهم و کلی).
-   - شامل ۱۰۰٪ گفتار استاد، الگوریتم‌های تشخیصی، هشدارهای بالینی (مثلاً عدم درخواست عجولانه MRI در اورژانس به دلیل اینسیدنتالوماهای ۷٪ آدرنال و ۱۰٪ هیپوفیز)، توجیهات فیزیولوژیک و تعاملات کلاسی است.
-   - فیلد `spoken_lecture` در هر اسلاید ذخیره شده و توسط `create_slide_pamphlet.py` دقیقاً قبل از کادر اسلاید با آیکون `🎙️ تدریس و بیانات کلاسی استاد` رندر می‌شود.
+1. **Track 1: متن تدریس کلاسی استاد (`spoken_lecture` در هر اسلاید - سنتز تفریقی و جانمایی Slide-First):**
+   - **Slide-First & Per-Slide Anchored Flow:** کادر اسلاید (Track 2) ابتدا رندر شده و بلافاصله توضیحات و نکات اختصاصی استاد (Track 1) مربوط به همان اسلاید با تیتر ظریف `🎙️ [⏱️XX:YY] توضیحات و نکات بالینی استاد:` و لیدهای سبز زمردی (`#1E8449`) زیر آن قرار می‌گیرد.
+   - **سنتز تفریقی (Subtractive Synthesis):** هر بخشی از گفتار استاد که صرفاً روخوانی مستقیم متن اسلاید، تعاریف یا جداول است از `spoken_lecture` حذف می‌شود. تنها نکات بالینی منحصر‌به‌فرد، چرایی پاتوفیزیولوژیک، هشدارهای تشخیصی اورژانس، کیس‌های بالینی و نکات امتحانی ثبت می‌گردد.
+   - **حذف خاموش (Silent Suppression):** اگر استاد در اسلایدی صرفاً به روخوانی پرداخته یا اسلاید را ورق زده باشد، فیلد `spoken_lecture` خالی (`""`) شده و هیچ کادر یا تیتری برای ویس در آن اسلاید رندر نمی‌شود (حداکثر ایجاز و زیبایی جزوه).
+   - **مرز بسته داده‌ها (Strict Closed-World):** تنها منابع مجاز برای تولید ریل ۱ و ۲، فایل‌های ترنسکریپت صوت و اسلایدهای ارائه هستند و هرگونه استفاده از حافظه پارامتریک یا اینترنت اکیداً ممنوع است.
    - اسلایدهای شروع فصل دارای فیلد اختیاری `section_title` هستند که تیتر H1 و ردیف جدول فهرست مطالب (TOC) را به صورت خودکار ایجاد می‌کنند.
    - **Track 1 Anti-Glossary Rule (قانون منع پرانتزگذاری معادل‌های انگلیسی در ویس استاد):**
      در نگارش شرح بیانات استاد (`spoken_lecture`)، از درج معادل انگلیسی واژگان عمومی، اسامی اندام‌ها، بیماری‌های شناخته‌شده و افعال در پرانتز (مانند `(Cardia)`، `(Benign)`، `(Bloating)`، `(Indigestion)`) اکیداً خودداری کنید. پرانتز انگلیسی منحصراً به سرواژه‌های معتبر بالینی (PUD, PPI, EGD, UBT, SAT, etc.) محدود است. فیلتر خودکار `clean_lecture_parentheses` معادل‌های مازاد را پیش از رندر پالایش می‌کند.

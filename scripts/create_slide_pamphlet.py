@@ -983,18 +983,21 @@ def detect_ref_book(text_corpus, default="هاریسون"):
 def add_spoken_lecture(doc, spoken_text, audio_time=None):
     """Renders Track 1: spoken classroom lecture narrative associated with a slide/topic,
     with intelligent markdown parsing, header sanitization, bullet recognition, and smooth justification."""
-    if not spoken_text:
+    if not spoken_text or not str(spoken_text).strip():
         return
         
     # Clean routine English dictionary translation parentheses from lecture audio narrative
     spoken_text = clean_lecture_parentheses(spoken_text)
+    if not spoken_text.strip():
+        return
         
     p_h = doc.add_paragraph()
-    set_p_rtl(p_h, space_before=12, space_after=3)
-    add_r(p_h, "🎙️ تدریس و بیانات کلاسی استاد", font_name="Dubai", size_pt=11, bold=True, color_rgb=(0x0E, 0x62, 0x51))
+    set_p_rtl(p_h, space_before=8, space_after=2)
+    add_r(p_h, "🎙️ ", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x1B, 0x4F, 0x72))
     if audio_time:
         start_t = extract_start_timestamp(audio_time) or audio_time
-        add_r(p_h, f"   [⏱️{start_t}]", font_name="Dubai", size_pt=9.5, bold=True, color_rgb=(0xD3, 0x54, 0x00))
+        add_r(p_h, f"[⏱️{start_t}] ", font_name="Dubai", size_pt=10, bold=True, color_rgb=(0xD3, 0x54, 0x00))
+    add_r(p_h, "توضیحات و نکات بالینی استاد:", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x1B, 0x4F, 0x72))
         
     blocks = parse_markdown_blocks(spoken_text)
     for block in blocks:
@@ -1133,43 +1136,6 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
             add_h1(doc, slide.get("section_title", ""), audio_time=slide.get("audio_time"))
             last_rendered_spoken_norm = None
             
-        # Track 1: Spoken Lecture (with Smart Deduplication & Cluster Awareness)
-        spoken_text = slide.get("spoken_lecture")
-        parent_ref = slide.get("parent_lecture_slide") or slide.get("cluster_parent")
-        
-        if spoken_text:
-            cleaned_spoken = clean_markdown_text(flatten_spoken_lecture(spoken_text)).strip()
-            # Suppress duplicate lecture banner if text is identical to preceding slide or explicitly child of parent slide
-            is_dup = (cleaned_spoken and cleaned_spoken == last_rendered_spoken_norm) or (parent_ref is not None)
-            if not is_dup:
-                add_spoken_lecture(doc, spoken_text, audio_time=slide.get("audio_time"))
-                last_rendered_spoken_norm = cleaned_spoken
-        elif parent_ref is not None:
-            # Clustered continuation under parent slide: nest slide box cleanly without redundant lecture header
-            pass
-            
-        # Track 1: Optional Figure with caption
-        if slide.get("track1_figure"):
-            fig = slide.get("track1_figure") or {}
-            add_figure_with_caption(doc, fig.get("img_path", ""), fig.get("title", ""), fig.get("caption", ""))
-            
-        # Track 1: Optional Q&A Boxes
-        for qa in slide.get("qa_list", []):
-            if isinstance(qa, (list, tuple)) and len(qa) >= 2:
-                add_qa_box(doc, qa[0], qa[1])
-            elif isinstance(qa, dict):
-                add_qa_box(doc, qa.get("question", ""), qa.get("answer", ""))
-                
-        # Track 1: Optional Cross-Reference Callouts (Non-linear lecture progression)
-        for cr in slide.get("cross_references", []):
-            if isinstance(cr, dict):
-                ref_text = cr.get("reason") or cr.get("note", "")
-                add_cross_reference_box(doc, cr.get("target_slide", ""), ref_text, direction=cr.get("direction", "forward"))
-            elif isinstance(cr, (list, tuple)) and len(cr) >= 2:
-                add_cross_reference_box(doc, cr[0], cr[1])
-            elif isinstance(cr, str):
-                add_cross_reference_box(doc, "", cr)
-                
         # Track 2: Slide Box & Metadata Augmentation
         raw_item = raw_db.get(num, {})
         slide_augmented = dict(slide)
@@ -1232,6 +1198,43 @@ def build_pamphlet_from_json(translated_json_path, output_docx_path, title="جز
             slide_augmented["is_visual"] = False
 
         add_slide_box_from_json(doc, slide_augmented, img_path=img_path, table_data=table_data, ref_book_name=ref_book)
+
+        # Track 1: Spoken Lecture (Rendered per-slide immediately after Track 2 Slide Box)
+        spoken_text = slide.get("spoken_lecture")
+        parent_ref = slide.get("parent_lecture_slide") or slide.get("cluster_parent")
+        
+        if spoken_text:
+            cleaned_spoken = clean_markdown_text(flatten_spoken_lecture(spoken_text)).strip()
+            # Suppress duplicate lecture banner if text is identical to preceding slide or explicitly child of parent slide
+            is_dup = (cleaned_spoken and cleaned_spoken == last_rendered_spoken_norm) or (parent_ref is not None)
+            if not is_dup and cleaned_spoken:
+                add_spoken_lecture(doc, spoken_text, audio_time=slide.get("audio_time"))
+                last_rendered_spoken_norm = cleaned_spoken
+        elif parent_ref is not None:
+            # Clustered continuation under parent slide: nest slide box cleanly without redundant lecture header
+            pass
+            
+        # Track 1: Optional Figure with caption
+        if slide.get("track1_figure"):
+            fig = slide.get("track1_figure") or {}
+            add_figure_with_caption(doc, fig.get("img_path", ""), fig.get("title", ""), fig.get("caption", ""))
+            
+        # Track 1: Optional Q&A Boxes
+        for qa in slide.get("qa_list", []):
+            if isinstance(qa, (list, tuple)) and len(qa) >= 2:
+                add_qa_box(doc, qa[0], qa[1])
+            elif isinstance(qa, dict):
+                add_qa_box(doc, qa.get("question", ""), qa.get("answer", ""))
+                
+        # Track 1: Optional Cross-Reference Callouts (Non-linear lecture progression)
+        for cr in slide.get("cross_references", []):
+            if isinstance(cr, dict):
+                ref_text = cr.get("reason") or cr.get("note", "")
+                add_cross_reference_box(doc, cr.get("target_slide", ""), ref_text, direction=cr.get("direction", "forward"))
+            elif isinstance(cr, (list, tuple)) and len(cr) >= 2:
+                add_cross_reference_box(doc, cr[0], cr[1])
+            elif isinstance(cr, str):
+                add_cross_reference_box(doc, "", cr)
         
     doc.save(output_docx_path)
     print(f"✅ جزوه با موفقیت در '{output_docx_path}' ذخیره شد.")

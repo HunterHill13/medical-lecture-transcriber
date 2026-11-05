@@ -356,6 +356,15 @@ def partition_slides(
                     "For clinical cases, alert signs, numbered steps, or comparisons, start paragraphs with a clear lead ending in a colon (e.g. '۱. سد پیشاپیتلیال:' or '🚨 دیسفاژی پیشرونده:') "
                     "so the pamphlet styler can highlight it in emerald green (#1E8449)."
                 ),
+                "rule_11_subtractive_spoken_lecture_and_silent_suppression": (
+                    "In Track 1 ('spoken_lecture'), perform SUBTRACTIVE SYNTHESIS: Compare the audio transcript with the slide bullets (Track 2). "
+                    "If the professor merely reads the slide bullets, definitions, or table rows aloud without adding new clinical commentary, strictly OMIT that redundant text from 'spoken_lecture'! "
+                    "Synthesize ONLY the professor's unique verbal commentary: pathophysiological reasoning, clinical pearls, diagnostic warnings, mnemonics, case anecdotes, and clinical exam tips. "
+                    "If the professor merely read the slide and added no extra explanation, set 'spoken_lecture': \"\" (empty string). Track 1 is rendered per-slide directly beneath each slide box, and slides with empty 'spoken_lecture' will be cleanly suppressed without clutter."
+                ),
+                "rule_12_strict_closed_world_zero_hallucination": (
+                    "Your ONLY sources for Track 1 and Track 2 are the audio transcripts and raw slides. You are strictly forbidden from using parametric knowledge, personal medical assumptions, or internet searches to invent or extrapolate content."
+                ),
             },
             "halo_prev": halo_prev,
             "slides": target_slice,
