@@ -2718,6 +2718,13 @@ def test_subtractive_synthesis_slide_first_rendering_and_silent_suppression(tmp_
     lecture_headers = [e for e in body_elements if e == "lecture_header"]
     assert len(lecture_headers) == 1, f"Expected exactly 1 lecture header (Slide 2 silently suppressed), got {len(lecture_headers)}"
 
+    # 3. Header styling and timestamp placement: Title in emerald green, followed by timestamp after colon in deep orange
+    lec_p = [p for p in doc.paragraphs if "توضیحات و نکات بالینی استاد:" in (p.text or "")][0]
+    assert "🎙️ توضیحات و نکات بالینی استاد:" in lec_p.runs[0].text
+    assert lec_p.runs[0].font.color.rgb == docx.shared.RGBColor(0x1E, 0x84, 0x49), "Title must be emerald green #1E8449"
+    assert "[⏱️02:15]" in lec_p.runs[1].text
+    assert lec_p.runs[1].font.color.rgb == docx.shared.RGBColor(0xD3, 0x54, 0x00), "Timestamp must be deep orange #D35400"
+
 
 def test_egm_conceptual_union_coverage_gate_passes_concise_lecture():
     """
