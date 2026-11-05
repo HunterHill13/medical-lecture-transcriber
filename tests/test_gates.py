@@ -2706,7 +2706,7 @@ def test_subtractive_synthesis_slide_first_rendering_and_silent_suppression(tmp_
             body_elements.append("tbl")
         elif tag == "p":
             text = child.text or ""
-            if "توضیحات استاد:" in text:
+            if "توضیحات و نکات بالینی استاد:" in text or "توضیحات استاد:" in text:
                 body_elements.append("lecture_header")
 
     # Table 0 is TOC table or slide table. Find first 'tbl' then 'lecture_header'
@@ -2719,8 +2719,8 @@ def test_subtractive_synthesis_slide_first_rendering_and_silent_suppression(tmp_
     assert len(lecture_headers) == 1, f"Expected exactly 1 lecture header (Slide 2 silently suppressed), got {len(lecture_headers)}"
 
     # 3. Header styling and timestamp placement: Title in emerald green, followed by timestamp after colon in deep orange
-    lec_p = [p for p in doc.paragraphs if "توضیحات استاد:" in (p.text or "")][0]
-    assert "🎙️ توضیحات استاد:" in lec_p.runs[0].text
+    lec_p = [p for p in doc.paragraphs if "توضیحات و نکات بالینی استاد:" in (p.text or "") or "توضیحات استاد:" in (p.text or "")][0]
+    assert "🎙️ توضیحات و نکات بالینی استاد:" in lec_p.runs[0].text or "🎙️ توضیحات استاد:" in lec_p.runs[0].text
     assert lec_p.runs[0].font.color.rgb == docx.shared.RGBColor(0x1E, 0x84, 0x49), "Title must be emerald green #1E8449"
     assert "[⏱️02:15]" in lec_p.runs[1].text
     assert lec_p.runs[1].font.color.rgb == docx.shared.RGBColor(0xD3, 0x54, 0x00), "Timestamp must be deep orange #D35400"
@@ -2778,3 +2778,62 @@ def test_egm_subtractive_slide_reading_subsumed_pass():
     issues, stats = evaluate_slide_level_grounding(slides, chunks)
     empty_issues = [i for i in issues if i.get("type") == "SLIDE_SPOKEN_LECTURE_EMPTY"]
     assert len(empty_issues) == 0, f"Subsumed slide reading must NOT raise SLIDE_SPOKEN_LECTURE_EMPTY: {empty_issues}"
+
+
+def test_prune_redundant_slide_reading_removes_reading_and_preserves_pearls():
+    """
+    Subtractive Spoken Lecture Deduplication Unit Test (v5.10.0):
+    Verifies that prune_redundant_slide_reading:
+    1. Prunes sentences that merely read aloud or repeat slide bullets.
+    2. Strictly preserves novel clinical pearls, structured lead-ins (🚨, ۱.), and drug dosages.
+    3. Silently suppresses (returns "") slides where 100% of speech was slide reading.
+    """
+    from text_utils import prune_redundant_slide_reading
+
+    # Case 1: Slide reading + unique pearl with lead-in
+    s1 = {
+        "slide_number": 1,
+        "title": "پپتیک اولسر",
+        "bullets": [
+            "نقص در مخاط دستگاه گوارش",
+            "امتداد تا لایه زیرمخاطی (ساب‌موکوزا)",
+            "شایع‌ترین علت هلیکوباکتر پیلوری"
+        ],
+        "spoken_lecture": (
+            "پپتیک اولسر نقصی در مخاط دستگاه گوارش است که تا لایه زیرمخاطی امتداد دارد. "
+            "شایع‌ترین علت آن هم هلیکوباکتر پیلوری است.\n\n"
+            "🚨 نکته بالینی: در بیماران مصرف‌کننده آسپرین باید همیشه PPI پروفیلاکسی با دوز ۲۰ میلی‌گرم شروع شود."
+        )
+    }
+    res1 = prune_redundant_slide_reading(s1)
+    assert "🚨 نکته بالینی:" in res1, "Clinical alert lead-in MUST be preserved"
+    assert "۲۰ میلی‌گرم" in res1 or "20" in res1, "Novel clinical dosage MUST be preserved"
+    assert "پپتیک اولسر نقصی در مخاط دستگاه گوارش است" not in res1, "Verbatim slide reading MUST be pruned"
+
+    # Case 2: 100% slide reading -> Silent Suppression
+    s2 = {
+        "slide_number": 2,
+        "title": "پپتیک اولسر",
+        "bullets": [
+            "نقص در مخاط دستگاه گوارش",
+            "امتداد تا لایه زیرمخاطی (ساب‌موکوزا)"
+        ],
+        "spoken_lecture": "پپتیک اولسر نقصی در مخاط دستگاه گوارش است که تا زیرمخاط امتداد می‌یابد."
+    }
+    res2 = prune_redundant_slide_reading(s2)
+    assert res2 == "", f"Expected empty string for silent suppression, got: {res2!r}"
+
+    # Case 3: Structured numbered items where item 1 is slide reading, item 2 is clinical pearl
+    s3 = {
+        "slide_number": 3,
+        "title": "هپاتیت مزمن",
+        "bullets": ["التهاب فضای پورت با ارتشاح لنفوسیت‌ها"],
+        "spoken_lecture": (
+            "۱. التهاب پورت: فضای پورت با ارتشاح لنفوسیت‌ها درگیر می‌شود.\n\n"
+            "۲. نکته تشخیصی: وجود گراند گلاس در سیتوپلاسم هپاتوسیت‌ها نشانه اختصاصی HBsAg است."
+        )
+    }
+    res3 = prune_redundant_slide_reading(s3)
+    assert "۲. نکته تشخیصی:" in res3, "Novel numbered point MUST be preserved"
+    assert "۱. التهاب پورت:" not in res3, "Redundant numbered slide reading MUST be pruned"
+

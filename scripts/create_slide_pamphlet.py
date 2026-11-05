@@ -993,7 +993,7 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
         
     p_h = doc.add_paragraph()
     set_p_rtl(p_h, space_before=8, space_after=2)
-    add_r(p_h, "🎙️ توضیحات استاد: ", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x1E, 0x84, 0x49))
+    add_r(p_h, "🎙️ توضیحات و نکات بالینی استاد: ", font_name="Dubai", size_pt=10.5, bold=True, color_rgb=(0x1E, 0x84, 0x49))
     if audio_time:
         start_t = extract_start_timestamp(audio_time) or audio_time
         add_r(p_h, f"[⏱️{start_t}]", font_name="Dubai", size_pt=10, bold=True, color_rgb=(0xD3, 0x54, 0x00))

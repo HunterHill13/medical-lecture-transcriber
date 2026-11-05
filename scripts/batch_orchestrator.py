@@ -41,6 +41,7 @@ from text_utils import (
     sanitize_latex_math,
     sanitize_ref_note,
     normalize_for_display,
+    prune_redundant_slide_reading,
 )
 
 
@@ -350,19 +351,17 @@ def partition_slides(
                     "NEVER use external/parametric medical memory (Harrison, UpToDate) to fabricate or expand bullets that do not exist on the slide. "
                     "The number and semantics of bullets must strictly correspond to the raw slide's lines."
                 ),
-                "rule_10_track_1_continuous_narrative_and_literary_editor": (
-                    "Track 1 ('spoken_lecture') MUST preserve the professor's continuous verbal teaching narrative as fluent, cohesive paragraphs. "
-                    "DO NOT artificially bulletize, fragment, or turn the professor's speech into bulleted checklists or artificial note lists ('نکته ۱، نکته ۲'). "
+                "rule_10_track_1_structured_lead_ins_and_literary_editor": (
+                    "Track 1 ('spoken_lecture') formats the professor's unique spoken commentary with structured emerald lead-ins, subheadings, clinical alert signs, and numbered points (e.g. '۱. ...:', '🚨 نکته بالینی:', 'کیس بالینی:', 'مکانیسم پاتوفیزیولوژی:'). "
                     "Act strictly as a high-level academic literary editor (ویراستار ادبی): convert colloquial/broken verbs to standard written Persian, "
-                    "eliminate oral filler words ('ببینید', 'خب', 'عرضم به حضورتون'), and smoothly link sentences so they read like a polished lecture transcript. "
+                    "eliminate oral filler words ('ببینید', 'خب', 'عرضم به حضورتون'), and ensure seamless flow. "
                     "NEVER insert English translations of routine words in parentheses (e.g. (Cardia), (Benign), (Bloating)); English parentheses are strictly restricted to valid clinical acronyms (PUD, PPI, EGD, etc.)."
                 ),
                 "rule_11_subtractive_spoken_lecture_and_silent_suppression": (
-                    "In Track 1 ('spoken_lecture'), perform SUBTRACTIVE SYNTHESIS while preserving narrative flow: Compare the audio lecture against the slide bullets (Track 2). "
-                    "If the professor is merely reading aloud or repeating what is already written on the slide, prune those redundant sentences from the narrative. "
-                    "Smooth the transitions between the remaining sentences so the paragraph flows naturally and coherently without awkward gaps. "
-                    "Every substantive clinical explanation, pathophysiological reasoning, clinical case, caveat, and oral elaboration of the professor MUST be faithfully preserved in prose. "
-                    "If the professor spoke nothing beyond verbatim reading the slide (zero extra explanation), set 'spoken_lecture': \"\" (empty string) for silent suppression."
+                    "In Track 1 ('spoken_lecture'), enforce strict SUBTRACTIVE SYNTHESIS against slide content (Track 2): "
+                    "Compare the audio transcript with the slide bullets and tables. If the professor merely reads the slide bullets, definitions, or table rows aloud without adding new clinical commentary, strictly OMIT that redundant text from 'spoken_lecture'! "
+                    "Synthesize ONLY the professor's unique verbal commentary: clinical pearls, pathophysiological reasoning, emergency warnings (🚨), clinical cases, caveats, and exam tips. Each distinct point or pearl should have a clear structured lead-in. "
+                    "If the professor merely read the slide and added no extra explanation, set 'spoken_lecture': \"\" (empty string) for silent suppression. Track 1 is rendered per-slide directly beneath each slide box, and slides with empty 'spoken_lecture' will be cleanly suppressed without clutter."
                 ),
                 "rule_12_strict_closed_world_zero_hallucination": (
                     "Your ONLY sources for Track 1 and Track 2 are the audio transcripts and raw slides. You are strictly forbidden from using parametric knowledge, personal medical assumptions, or internet searches to invent or extrapolate content."
@@ -537,6 +536,8 @@ def merge_slide_batches(
 
             # Inherit structural flags from raw_slide if available
             raw_s = raw_by_num.get(s_num)
+            if cleaned_slide.get("spoken_lecture"):
+                cleaned_slide["spoken_lecture"] = prune_redundant_slide_reading(cleaned_slide, raw_slide=raw_s)
             if raw_s:
                 if _slide_has_table(raw_s) and not _slide_has_valid_translated_table(cleaned_slide):
                     warnings.append({

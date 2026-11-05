@@ -1943,4 +1943,144 @@ def sanitize_ref_note(text: str) -> str:
     return cleaned
 
 
+def prune_redundant_slide_reading(slide_obj: dict, raw_slide: Optional[dict] = None) -> str:
+    """
+    Subtractive Spoken Lecture Deduplication Engine:
+    Compares the professor's spoken lecture (Track 1) against the slide content (Track 2 bullets,
+    tables, title, and raw slide).
+    
+    Removes sentences or lines that merely read aloud or repeat what is already stated in the slide,
+    while strictly preserving:
+    - Unique pathophysiological reasoning, clinical anecdotes, and oral elaborations
+    - Structured lead-ins, subheadings, and clinical alert signs (e.g. '۱. ...:', '🚨 نکته بالینی:')
+    - Clinical pearls, diagnostic caveats, drug dosages, and novel numbers
+    
+    If 100% of the speech on a slide was redundant slide-reading (zero unique commentary),
+    returns "" (empty string) to trigger Silent Suppression in Word rendering.
+    """
+    if not isinstance(slide_obj, dict):
+        return ""
+    spoken = slide_obj.get("spoken_lecture", "")
+    if not spoken or not str(spoken).strip():
+        return ""
+
+    slide_parts = [slide_obj.get("title", ""), slide_obj.get("title_fa", "")]
+    for b in slide_obj.get("bullets", []):
+        slide_parts.append(str(b))
+    for t_row in slide_obj.get("table_data", []):
+        if isinstance(t_row, list):
+            slide_parts.extend(str(c) for c in t_row)
+        elif isinstance(t_row, dict):
+            slide_parts.extend(str(v) for v in t_row.values())
+
+    raw = raw_slide or slide_obj.get("raw_slide")
+    if isinstance(raw, dict):
+        slide_parts.append(raw.get("title", ""))
+        for b in raw.get("bullets", []):
+            slide_parts.append(str(b))
+        for t_row in raw.get("table_data", []):
+            if isinstance(t_row, list):
+                slide_parts.extend(str(c) for c in t_row)
+            elif isinstance(t_row, dict):
+                slide_parts.extend(str(v) for v in t_row.values())
+
+    slide_text = " ".join(p for p in slide_parts if p)
+    slide_substantive = extract_substantive_tokens(slide_text)
+    slide_facts = extract_clinical_facts(slide_text)
+    slide_numbers = set().union(
+        slide_facts.get("numbers", set()),
+        slide_facts.get("percentages", set()),
+        slide_facts.get("dosages", set()),
+        slide_facts.get("ranges", set()),
+        slide_facts.get("lab_values", set()),
+    )
+
+    AUX_VERB_STEMS = {
+        "یابد", "شود", "گردد", "دارد", "هستند", "باشند", "کنند", "کنیم", "دادند",
+        "داد", "رسد", "دید", "رفت", "آمد", "می‌شود", "می‌گردد", "می‌یابد", "است",
+        "بود", "می‌کند", "گفته", "پرداختند", "نمودند", "دارند", "باشیم", "باشید"
+    }
+
+    def is_token_covered(tok: str) -> bool:
+        if tok in slide_substantive or tok.lower() in slide_substantive:
+            return True
+        t_stem = tok
+        for sfx in ("ی", "ها", "های", "ان", "ات", "مند", "گون"):
+            if t_stem.endswith(sfx) and len(t_stem) > len(sfx) + 2:
+                t_stem = t_stem[:-len(sfx)]
+                break
+        if t_stem in slide_substantive:
+            return True
+        for st in slide_substantive:
+            if tok in st or st in tok:
+                return True
+            st_stem = st
+            for sfx in ("ی", "ها", "های", "ان", "ات"):
+                if st_stem.endswith(sfx) and len(st_stem) > len(sfx) + 2:
+                    st_stem = st_stem[:-len(sfx)]
+                    break
+            if t_stem == st_stem:
+                return True
+        return False
+
+    pearl_markers = (
+        "🚨", "⚠️", "💡", "📌", "🔬", "نکته بالینی", "کیس بالینی", "هشدار اورژانس",
+        "نکته امتحانی", "مکانیسم پاتوفیزیولوژی", "نکته کلیدی", "توجه بالینی"
+    )
+
+    lines = [l.strip() for l in spoken.splitlines() if l.strip()]
+    kept_lines = []
+
+    for line in lines:
+        has_marker = any(m in line for m in pearl_markers)
+        lead, body = split_structured_lead(line)
+        target_text = body if lead else line
+
+        sentences = [s.strip() for s in re.split(r'(?<!\d)[.!?؛\?](?!\d)\s*', target_text) if s.strip()]
+        if not sentences:
+            sentences = [target_text]
+
+        kept_sentences = []
+        for sent in sentences:
+            sent_toks = extract_substantive_tokens(sent)
+            sent_facts = extract_clinical_facts(sent)
+            sent_numbers = set().union(
+                sent_facts.get("numbers", set()),
+                sent_facts.get("percentages", set()),
+                sent_facts.get("dosages", set()),
+                sent_facts.get("ranges", set()),
+                sent_facts.get("lab_values", set()),
+            )
+
+            novel_numbers = sent_numbers - slide_numbers
+            covered_toks = {t for t in sent_toks if is_token_covered(t)}
+            novel_toks = {t for t in (sent_toks - covered_toks) if t not in AUX_VERB_STEMS}
+
+            if len(sent_toks) == 0 and not has_marker and not novel_numbers:
+                continue
+
+            overlap_ratio = (len(covered_toks) / len(sent_toks)) if sent_toks else 0.0
+
+            if not has_marker and overlap_ratio >= 0.70 and not novel_numbers and len(novel_toks) <= 1:
+                # Redundant slide reading sentence - prune!
+                continue
+
+            kept_sentences.append(sent)
+
+        if kept_sentences:
+            if lead:
+                reconstructed_body = ". ".join(kept_sentences)
+                if not reconstructed_body.endswith((".", "!", "؟")):
+                    reconstructed_body += "."
+                kept_lines.append(f"{lead} {reconstructed_body}")
+            else:
+                if len(kept_sentences) == len(sentences):
+                    kept_lines.append(line)
+                else:
+                    reconstructed = ". ".join(kept_sentences)
+                    if not reconstructed.endswith((".", "!", "؟")):
+                        reconstructed += "."
+                    kept_lines.append(reconstructed)
+
+    return "\n\n".join(kept_lines).strip()
 
