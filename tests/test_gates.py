@@ -2706,7 +2706,7 @@ def test_subtractive_synthesis_slide_first_rendering_and_silent_suppression(tmp_
             body_elements.append("tbl")
         elif tag == "p":
             text = child.text or ""
-            if "توضیحات و نکات بالینی استاد:" in text:
+            if "توضیحات استاد:" in text:
                 body_elements.append("lecture_header")
 
     # Table 0 is TOC table or slide table. Find first 'tbl' then 'lecture_header'
@@ -2719,8 +2719,8 @@ def test_subtractive_synthesis_slide_first_rendering_and_silent_suppression(tmp_
     assert len(lecture_headers) == 1, f"Expected exactly 1 lecture header (Slide 2 silently suppressed), got {len(lecture_headers)}"
 
     # 3. Header styling and timestamp placement: Title in emerald green, followed by timestamp after colon in deep orange
-    lec_p = [p for p in doc.paragraphs if "توضیحات و نکات بالینی استاد:" in (p.text or "")][0]
-    assert "🎙️ توضیحات و نکات بالینی استاد:" in lec_p.runs[0].text
+    lec_p = [p for p in doc.paragraphs if "توضیحات استاد:" in (p.text or "")][0]
+    assert "🎙️ توضیحات استاد:" in lec_p.runs[0].text
     assert lec_p.runs[0].font.color.rgb == docx.shared.RGBColor(0x1E, 0x84, 0x49), "Title must be emerald green #1E8449"
     assert "[⏱️02:15]" in lec_p.runs[1].text
     assert lec_p.runs[1].font.color.rgb == docx.shared.RGBColor(0xD3, 0x54, 0x00), "Timestamp must be deep orange #D35400"
