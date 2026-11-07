@@ -50,6 +50,7 @@ from text_utils import (
     sanitize_latex_math,
     extract_start_timestamp,
     clean_lecture_parentheses,
+    clean_pamphlet_voice,
     split_structured_lead
 )
 
@@ -987,7 +988,7 @@ def add_spoken_lecture(doc, spoken_text, audio_time=None):
         return
         
     # Clean routine English dictionary translation parentheses from lecture audio narrative
-    spoken_text = clean_lecture_parentheses(spoken_text)
+    spoken_text = clean_pamphlet_voice(clean_lecture_parentheses(spoken_text))
     if not spoken_text.strip():
         return
         

@@ -1943,6 +1943,63 @@ def sanitize_ref_note(text: str) -> str:
     return cleaned
 
 
+
+def clean_pamphlet_voice(text: str) -> str:
+    """
+    Direct Pamphlet Voice Transformer (v5.11.0):
+    Eliminates colloquial third-person reporting phrases ('استاد گفتند', 'استاد در تبیین...',
+    'استاد اشاره می‌کنند که', 'بر اساس فرمایش استاد') and converts them into direct,
+    authoritative academic pamphlet voice with bold clinical leads (**موضوع:**).
+    Ensures that the professor's spoken lecture is rendered in direct educational voice
+    beneath the emerald header '🎙️ توضیحات و نکات بالینی استاد: [⏱️XX:YY]'.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    cleaned = text
+
+    # 1. Transform: استاد در تبیین/توضیح/بررسی X اشاره می‌کنند/توضیح می‌دهند که Y -> **X:** Y
+    topic_pattern = re.compile(
+        r'(?:^|\n|\.\s*)\s*استاد\s+(?:محترم\s+)?در\s+(?:تبیین|توضیح|بررسی)\s+([^:،\n]+?)\s+'
+        r'(?:اشاره\s+(?:می‌کنند|کردند|نمودند)\s+که|توضیح\s+(?:می‌دهند|دادند)\s+که|تأکید\s+(?:می‌کنند|کردند)\s+که|بیان\s+(?:می‌کنند|کردند|فرمودند)\s+که|فرمودند\s+که|گفتند\s+که)\s*',
+        re.MULTILINE
+    )
+    cleaned = topic_pattern.sub(lambda m: f'\n\n**{m.group(1).strip()}:** ', cleaned)
+
+    # 2. Strip lead-in reporting phrases: استاد اشاره می‌کنند که / استاد توضیح دادند که / استاد فرمودند که
+    lead_pattern = re.compile(
+        r'(?:^|\n|\.\s*)\s*استاد\s+(?:محترم\s+)?(?:در\s+این\s+بخش\s+|در\s+ادامه\s+)?'
+        r'(?:اشاره\s+(?:می‌کنند|کردند|نمودند)\s+که|توضیح\s+(?:می‌دهند|دادند)\s+که|تأکید\s+(?:می‌کنند|کردند)\s+که|بیان\s+(?:می‌کنند|کردند|فرمودند)\s+که|فرمودند\s+که|گفتند\s+که|مطرح\s+(?:کردند|می‌کنند)\s+که|عنوان\s+(?:کردند|می‌کنند)\s+که|یادآور\s+شدند\s+که|خاطرنشان\s+کردند\s+که)\s*',
+        re.MULTILINE
+    )
+    cleaned = lead_pattern.sub(lambda m: '\n\n' if '\n' in m.group(0) else '. ', cleaned)
+
+    # 3. Strip: بر اساس / طبق / مطابق توضیحات استاد
+    base_pattern = re.compile(
+        r'(?:بر\s+اساس|طبق|مطابق)\s+(?:توضیحات|فرموده|فرمایش|بیانات|گفته‌های|نکات|آموزش‌های)\s+استاد[،:]?\s*',
+        re.IGNORECASE
+    )
+    cleaned = base_pattern.sub('', cleaned)
+
+    # 4. Strip: همان‌طور که استاد فرمودند/گفتند
+    as_said_pattern = re.compile(
+        r'(?:همان‌طور|همانگونه)\s+که\s+استاد\s+(?:فرمودند|گفتند|توضیح\s+دادند|اشاره\s+کردند)[،:]?\s*',
+        re.IGNORECASE
+    )
+    cleaned = as_said_pattern.sub('', cleaned)
+
+    # 5. Strip trailing: به گفته استاد / طبق نظر استاد
+    trail_pattern = re.compile(
+        r'[،,]?\s*(?:به\s+گفته|طبق\s+نظر|بر\s+اساس\s+گفته|از\s+نظر)\s+استاد(?=[\.\n،]|$)',
+        re.IGNORECASE
+    )
+    cleaned = trail_pattern.sub('', cleaned)
+
+    # 6. Clean consecutive newlines/spaces
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    cleaned = re.sub(r'^\s*[\.،]\s*', '', cleaned)
+    return cleaned.strip()
+
+
 def prune_redundant_slide_reading(slide_obj: dict, raw_slide: Optional[dict] = None) -> str:
     """
     Subtractive Spoken Lecture Deduplication Engine:
@@ -1963,6 +2020,24 @@ def prune_redundant_slide_reading(slide_obj: dict, raw_slide: Optional[dict] = N
     spoken = slide_obj.get("spoken_lecture", "")
     if not spoken or not str(spoken).strip():
         return ""
+
+    # Always ensure direct pamphlet voice
+    spoken = clean_pamphlet_voice(spoken)
+    if not spoken.strip():
+        return ""
+
+    # Visual Slide Protocol: Schematic, cartoon, or diagram series slides with 0 text bullets
+    # must NOT have their spoken mechanisms or explanations suppressed!
+    raw = raw_slide or slide_obj.get("raw_slide")
+    is_visual_slide = bool(
+        slide_obj.get("is_visual")
+        or (raw and raw.get("is_visual"))
+        or slide_obj.get("has_diagram")
+        or slide_obj.get("fig_paths")
+        or (not slide_obj.get("bullets") and not (raw and raw.get("bullets")))
+    )
+    if is_visual_slide and not slide_obj.get("bullets"):
+        return spoken
 
     slide_parts = [slide_obj.get("title", ""), slide_obj.get("title_fa", "")]
     for b in slide_obj.get("bullets", []):

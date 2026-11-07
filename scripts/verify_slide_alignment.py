@@ -334,10 +334,35 @@ def _check_structural_extras(num: int, raw_item: dict, trans_item: dict, issues:
             "message": f"Slide {num}: Bullets are flat strings. Recommend using tuple (lead, text) or {{'lead': ..., 'text': ...}} for distinct bold headers."
         })
         
-    has_tbl = bool(raw_item.get("has_tables") or raw_item.get("has_image_table") or trans_item.get("has_table"))
+    raw_has_table = bool(
+        raw_item.get("has_tables")
+        or raw_item.get("has_image_table")
+        or raw_item.get("has_table")
+        or raw_item.get("table_data")
+        or (isinstance(raw_item.get("tables"), list) and len(raw_item["tables"]) > 0)
+    )
+    has_tbl = bool(raw_has_table or trans_item.get("has_table"))
     td = trans_item.get("table_data") or trans_item.get("structured_tables") or trans_item.get("reference_tables")
     if isinstance(td, list) and len(td) >= 1 and isinstance(td[0], dict):
         td = td[0]
+
+    # Check 3.1b: Synthetic Table Inflation Gate (Table Authenticity Law)
+    # Strictly forbids fabricating synthetic 3-column tables for slides that do not contain native tables.
+    if td and not raw_has_table and not trans_item.get("is_reference_table"):
+        err_msg = (
+            f"SYNTHETIC TABLE INFLATION at Slide {num}: Presentation slide contains NO native table in raw presentation or reference, "
+            f"but synthetic 'table_data' was fabricated. Only slides with native tables in presentation or reference figures may use table_data. "
+            f"Represent content as standard structured bullet points."
+        )
+        issues.append({
+            "type": "SYNTHETIC_TABLE_INFLATION",
+            "error_type": "SYNTHETIC_TABLE_INFLATION",
+            "severity": "error",
+            "slide_number": num,
+            "message": err_msg,
+            "remediation_action": f"Remove synthetic 'table_data' from Slide {num} and represent content as structured bullet points."
+        })
+
     if has_tbl and not td:
         err_msg = f"MISSING TABLE DATA at Slide {num}: Presentation slide contains a structured or visual table, but 'table_data' is missing from translated_slides.json!"
         issues.append({

@@ -38,6 +38,7 @@ if SCRIPTS_DIR not in sys.path:
 
 from text_utils import (
     clean_lecture_parentheses,
+    clean_pamphlet_voice,
     sanitize_latex_math,
     sanitize_ref_note,
     normalize_for_display,
@@ -132,7 +133,7 @@ def _sanitize_slide_object(slide: Dict[str, Any], ref_book_name: str = "رفرن
         if isinstance(s.get(str_key), str):
             s[str_key] = sanitize_latex_math(s[str_key])
     if isinstance(s.get("spoken_lecture"), str):
-        s["spoken_lecture"] = clean_lecture_parentheses(s["spoken_lecture"])
+        s["spoken_lecture"] = clean_pamphlet_voice(clean_lecture_parentheses(s["spoken_lecture"]))
 
     if isinstance(s.get("ref_note"), str) and s["ref_note"].strip():
         s["ref_note"] = sanitize_ref_note(sanitize_latex_math(s["ref_note"]))
@@ -351,10 +352,10 @@ def partition_slides(
                     "NEVER use external/parametric medical memory (Harrison, UpToDate) to fabricate or expand bullets that do not exist on the slide. "
                     "The number and semantics of bullets must strictly correspond to the raw slide's lines."
                 ),
-                "rule_10_track_1_structured_lead_ins_and_literary_editor": (
-                    "Track 1 ('spoken_lecture') formats the professor's unique spoken commentary with structured emerald lead-ins, subheadings, clinical alert signs, and numbered points (e.g. '۱. ...:', '🚨 نکته بالینی:', 'کیس بالینی:', 'مکانیسم پاتوفیزیولوژی:'). "
-                    "Act strictly as a high-level academic literary editor (ویراستار ادبی): convert colloquial/broken verbs to standard written Persian, "
-                    "eliminate oral filler words ('ببینید', 'خب', 'عرضم به حضورتون'), and ensure seamless flow. "
+                "rule_10_direct_pamphlet_voice_and_zero_third_person_attribution": (
+                    "MANDATORY DIRECT PAMPHLET VOICE (قانون لحن جزوه‌ای مستقیم): Strictly FORBIDDEN to use third-person reporting phrases ('استاد گفتند', 'استاد در تبیین...', 'استاد اشاره می‌کنند که', 'بر اساس فرمایش استاد', 'طبق توضیحات استاد'). "
+                    "The heading '🎙️ توضیحات و نکات بالینی استاد: [⏱️XX:YY]' already identifies the speaker. Write directly in authoritative medical textbook/pamphlet voice with bold clinical leads (e.g. '**آستانه مصرف الکل:** ...') and numbered points. "
+                    "Count of the word 'استاد' in 'spoken_lecture' must be exactly 0! Eliminate colloquial filler words ('ببینید', 'خب', 'عرضم به حضورتون') and convert broken verbs to standard written Persian. "
                     "NEVER insert English translations of routine words in parentheses (e.g. (Cardia), (Benign), (Bloating)); English parentheses are strictly restricted to valid clinical acronyms (PUD, PPI, EGD, etc.)."
                 ),
                 "rule_11_subtractive_spoken_lecture_and_silent_suppression": (
@@ -363,8 +364,19 @@ def partition_slides(
                     "Synthesize ONLY the professor's unique verbal commentary: clinical pearls, pathophysiological reasoning, emergency warnings (🚨), clinical cases, caveats, and exam tips. Each distinct point or pearl should have a clear structured lead-in. "
                     "If the professor merely read the slide and added no extra explanation, set 'spoken_lecture': \"\" (empty string) for silent suppression. Track 1 is rendered per-slide directly beneath each slide box, and slides with empty 'spoken_lecture' will be cleanly suppressed without clutter."
                 ),
-                "rule_12_strict_closed_world_zero_hallucination": (
-                    "Your ONLY sources for Track 1 and Track 2 are the audio transcripts and raw slides. You are strictly forbidden from using parametric knowledge, personal medical assumptions, or internet searches to invent or extrapolate content."
+                "rule_12_strict_audio_grounding_zero_hallucination": (
+                    "STRICT AUDIO GROUNDING INVARIANT (قانون طلایی تطبیق صوت): Your ONLY source for Track 1 ('spoken_lecture') is the authentic audio transcript files in 'transcripts/'. "
+                    "You are STRICTLY FORBIDDEN from using parametric memory, external textbook knowledge, or internet searches to inject pathophysiology not spoken by the professor (e.g. lactic acidosis, tubulin inhibition, DNA double-strand breaks, leukemoid reactions). "
+                    "If the professor spoke only one brief point on a slide, record ONLY that one point without fabricating extra concepts."
+                ),
+                "rule_13_table_authenticity_law": (
+                    "TABLE AUTHENTICITY LAW (قانون اصالت جداول): Only slides that contain an actual native table in raw PowerPoint slides ('has_tables': true or native table screenshot) are allowed to use 'table_data'. "
+                    "Fabricating synthetic 3-column tables for normal bulleted text slides is STRICTLY PROHIBITED and will trigger the SYNTHETIC_TABLE_INFLATION gate. All other slides must remain standard structured bullet boxes."
+                ),
+                "rule_14_visual_schematic_series_protocol": (
+                    "VISUAL & SCHEMATIC SERIES PROTOCOL (پروتکل اسلایدهای تصویری و انیمیشنی): Slides without written text bullets (diagrams, cartoons, Osmosis animation frames) MUST NOT be left empty ('spoken_lecture': \"\" is forbidden on visual series slides!). "
+                    "Recognize that multi-frame animations represent a continuous pathophysiological chain of audio. In frames where the professor explains a mechanism, record that audio under direct pamphlet voice. "
+                    "In rapid visual frames, write a concise mechanism based strictly on the objective OCR text and visible visual elements of the image (never invent external ungrounded theories)."
                 ),
             },
             "halo_prev": halo_prev,
@@ -536,6 +548,30 @@ def merge_slide_batches(
 
             # Inherit structural flags from raw_slide if available
             raw_s = raw_by_num.get(s_num)
+
+            # Table Authenticity Law: If raw_slide has no table, forbid synthetic table fabrication
+            if raw_s and not _slide_has_table(raw_s) and cleaned_slide.get("table_data") and not cleaned_slide.get("is_reference_table"):
+                synth_td = cleaned_slide.pop("table_data")
+                headers = []
+                rows = []
+                if isinstance(synth_td, dict):
+                    headers = synth_td.get("headers", [])
+                    rows = synth_td.get("rows") or synth_td.get("items", [])
+                elif isinstance(synth_td, (list, tuple)) and len(synth_td) == 2:
+                    headers, rows = synth_td
+                new_bullets = list(cleaned_slide.get("bullets", []))
+                for r in rows:
+                    if isinstance(r, list):
+                        row_str = " | ".join(str(c) for c in r if str(c).strip())
+                        if row_str:
+                            new_bullets.append(f"• {row_str}")
+                cleaned_slide["bullets"] = new_bullets
+                warnings.append({
+                    "code": "SYNTHETIC_TABLE_CONVERTED_TO_BULLETS",
+                    "slide_number": s_num,
+                    "message": f"Slide {s_num} fabricated a synthetic table without a native table in raw_slides.json. Converted to structured bullets.",
+                })
+
             if cleaned_slide.get("spoken_lecture"):
                 cleaned_slide["spoken_lecture"] = prune_redundant_slide_reading(cleaned_slide, raw_slide=raw_s)
             if raw_s:

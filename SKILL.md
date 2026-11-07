@@ -1,7 +1,7 @@
 ---
 name: medical-lecture-transcriber
 description: >-
-  Publication-grade medical study guide and lecture transcription workflow (v5.10.0): Per-Slide Subtractive Spoken Lecture Synthesis & Slide-First Visual Flow (renders Slide Box Track 2 first, followed per-slide by unique verbal clinical explanations; silently suppresses Track 1 when professor merely reads slide), Slim Emerald Lecture Header (replaces bulky legacy banner with '🎙️ توضیحات و نکات بالینی استاد: [⏱️XX:YY]' in emerald green #1E8449 with deep orange #D35400 timestamp after the colon), Strict Closed-World Zero-Hallucination Invariant (restricts synthesis strictly to audio transcripts and raw slides with zero external memory injection), EGM Conceptual Union Coverage Gate (replaces 50% word count gate with conceptual set union verifying that substantive audio concepts are accounted for by Slide Content OR Spoken Lecture), Anatomical & Substantive Recall Engine (unblocks organs like کبد, قلب, کلیه from generic stopwords, expanding bilingual medical concept coverage to 350+ entries and ensuring pure Persian anatomical descriptions pass recall gates at >= 50%), Eponym & Mixed-Case Serology Parenthetical Validator (permits medical eponyms like Space of Disse, Canal of Hering, Kupffer cells, serology markers like HBsAg, Anti-HBc, and numerical ranges with units like 1400-1600 g without glossary violation), Single-Bullet Text Slide Screenshot Guard (suppresses full-page slide screenshot embedding on single-bullet text slides), Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
+  Publication-grade medical study guide and lecture transcription workflow (v5.11.0): Per-Slide Subtractive Spoken Lecture Synthesis & Slide-First Visual Flow (renders Slide Box Track 2 first, followed per-slide by unique verbal clinical explanations; silently suppresses Track 1 when professor merely reads slide), Slim Emerald Lecture Header (replaces bulky legacy banner with '🎙️ توضیحات و نکات بالینی استاد: [⏱️XX:YY]' in emerald green #1E8449 with deep orange #D35400 timestamp after the colon), Strict Closed-World Zero-Hallucination Invariant (restricts synthesis strictly to audio transcripts and raw slides with zero external memory injection), EGM Conceptual Union Coverage Gate (replaces 50% word count gate with conceptual set union verifying that substantive audio concepts are accounted for by Slide Content OR Spoken Lecture), Anatomical & Substantive Recall Engine (unblocks organs like کبد, قلب, کلیه from generic stopwords, expanding bilingual medical concept coverage to 350+ entries and ensuring pure Persian anatomical descriptions pass recall gates at >= 50%), Eponym & Mixed-Case Serology Parenthetical Validator (permits medical eponyms like Space of Disse, Canal of Hering, Kupffer cells, serology markers like HBsAg, Anti-HBc, and numerical ranges with units like 1400-1600 g without glossary violation), Single-Bullet Text Slide Screenshot Guard (suppresses full-page slide screenshot embedding on single-bullet text slides), Spoken Lecture Emerald Lead-In Styler (renders lecture sub-headings, alert signs, and numbered leads in unified #1E8449), Track 1 Anti-Glossary Filter (clean_lecture_parentheses auto-stripping routine English dictionary translations while strictly protecting clinical acronyms like PUD, PPI, EGD, H. pylori, NSAIDs), Concise Lecture Timestamp Engine (formats slide & heading timestamps as '[⏱️XX:YY]' using start time while stripping verbose ranges), enforces Track 2 Slide Box Strict Fidelity
   & Anti-Enrichment Protocol (rule_9 + 'AUDIO_LEAKAGE_INTO_SLIDE_BOX' & 'PARAMETRIC_BULLET_FABRICATION' & 'BULLET_COUNT_INFLATION' gates
   strictly preventing subagents from injecting spoken lecture audio or external textbook memory into slide box bullets),
   Persian-Only Slide Box Header Conciseness Engine (enforces clean, focused Persian-only slide titles without redundant parenthetical English),
@@ -42,7 +42,7 @@ description: >-
   in tests/, and Clean Portable POSIX Packaging (100% '/' paths, 0 pycache).
 ---
 
-# Medical Lecture Transcriber & Study Guide Generator (v5.10.0)
+# Medical Lecture Transcriber & Study Guide Generator (v5.11.0)
 
 ## Overview
 
@@ -742,6 +742,20 @@ uv run python scripts/run_pipeline.py annotate --docx slides.docx --annotations 
    - **ممنوعیت نشت صوت استاد به بالت‌های اسلاید:** ساب‌ایجنت‌ها حق ندارند توضیحات شفاهی استاد سر کلاس را وارد بالت‌های اسلاید کنند. توضیحات شفاهی منحصراً متعلق به Track 1 (`spoken_lecture`) است.
    - **ممنوعیت توهم حافظه پارامتریک:** در اسلایدهای کوتاه با ۱ الی ۲ سطر، ساب‌ایجنت‌ها حق ندارند از حافظه پزشکی خود (هاریسون/آپ‌تودیت) بالت‌های اضافی حاوی معیارها، بازه‌های زمانی یا درصدهای ناموجود در اسلاید بسازند.
    - **گیت اعتبارسنجی تک‌به‌تک بالت‌ها:** گیت خودکار `verify_slide_alignment.py` هر بالت را به صورت مجزا ارزیابی کرده و در صورت کشف بالت بدون رفرنس در اسلاید خام، خطای سخت `AUDIO_LEAKAGE_INTO_SLIDE_BOX` یا `PARAMETRIC_BULLET_FABRICATION` صادر نموده و تورم تعداد بالت‌ها را با `BULLET_COUNT_INFLATION` متوقف می‌سازد.
+
+---
+
+
+5. **سیاست‌های قطعی کیفیت، لحن جزوه‌ای مستقیم و مهار هذیان (Anti-Hallucination & Direct Pamphlet Voice — v5.11.0):**
+   - **قانون طلایی تطبیق صوت (Strict Audio Grounding Invariant):**
+     فیلد `spoken_lecture` منحصراً و اکیداً به مطالبی اختصاص دارد که مدرس در صوت جلسه بیان کرده است.
+     *ممنوعیت مطلق تزریق دانش پارامتریک:* مدل زبانی تحت هیچ شرایطی حق ندارد اگر مطلبی در صوت نیامده است، آن را از حافظه کتاب‌های پزشکی استخراج کند (نظیر اسیدوز لاکتیک، مهار توبولین، شکست دورشته‌ای DNA، یا واکنش‌های لوکموئید نامربوط). اگر استاد در یک اسلاید فقط یک نکته گفته است، فقط همان یک نکته باید ثبت شود.
+   - **قانون لحن جزوه‌ای مستقیم (Direct Pamphlet Voice Invariant):**
+     *ممنوعیت عبارات انتسابی سوم‌شخص:* نوشتن عباراتی مانند «استاد گفتند»، «استاد در تبیین...»، «استاد توضیح می‌دهند که...»، «بر اساس فرمایش استاد...» در بدنه متن **مطلقا ممنوع** است. عنوان این بخش از قبل به صورت `🎙️ توضیحات و نکات بالینی استاد: [⏱️XX:YY]` درج شده است. متن داخل بخش باید کاملاً علمی، دارای لیدهای برجسته (`**عنوان نکته:** متن`)، بدون هیچ‌گونه فعل انتسابی سوم‌شخص و به صورت نکته‌وار و جزوه‌ای نوشته شود و شمارش کل واژه «استاد» در بخش لکچر به صفر برسد. تابع خودکار `clean_pamphlet_voice` عبارات گزارشگری را پیش از کامپایل تصفیه می‌کند.
+   - **پروتکل مواجهه با اسلایدهای تصویری و انیمیشنی (Visual / Schematic Protocol):**
+     اسلایدهایی که فاقد متن کتبی بوده و تصویر، نمودار، کارتون یا انیمیشن دارند نباید خالی رها شوند (`spoken_lecture: ""` ممنوع). ایجنت باید زنجیره زمانی صوت استاد را در آن مقطع شناسایی کند و متناظر با فریم جاری درج نماید. در فریم‌های میانی کم‌کلام یا بصری محض (مثل دایره‌های سفید چربی، کبد سالم، یا اجسام مالوری)، ایجنت موظف است **صرفاً بر اساس متن و برچسب‌های استخراج‌شده با OCR از روی همان تصویر**، شرح مختصر مکانیسمی به سبک جزوه بنویسد، بدون آنکه تئوری‌های خارج از تصویر را جعل کند.
+   - **قانون اصالت جداول (Table Authenticity Invariant + `SYNTHETIC_TABLE_INFLATION`):**
+     ایجاد جداول ۳ ستونه ساختگی برای اسلایدهای متنی ممنوع است. تبدیل اسلاید به جدول فقط و فقط برای اسلایدهایی مجاز است که در پاورپوینت اصلی ارائه‌دهنده یا رفرنس، قالب جدول رسمی داشته باشند. گیت خودکار `SYNTHETIC_TABLE_INFLATION` هرگونه ساخت جدول روی اسلایدهای متنی فاقد جدول را مسدود می‌سازد و کامپایلر آن را خودکار به بالت‌های استاندارد برمی‌گرداند.
 
 ---
 
