@@ -37,6 +37,7 @@ if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
 from text_utils import (
+    prune_redundant_slide_reading,
     parse_time_to_seconds,
     format_seconds_to_time,
     extract_tokens,
@@ -307,6 +308,39 @@ def build_transcript_segments(transcript_chunks: list) -> list[dict]:
             seg_idx += 1
     return segments
 
+
+def check_redundant_slide_spoken_overlap(slide: dict) -> Optional[dict]:
+    """
+    Subtractive Synthesis Gate (v5.12.0):
+    Evaluates whether spoken_lecture on a slide is merely a redundant paraphrase
+    of the slide's bullets with 0 novel clinical facts/pearls.
+    If so, returns an issue dict with type 'REDUNDANT_SLIDE_SPOKEN_OVERLAP'.
+    """
+    if not isinstance(slide, dict):
+        return None
+    spoken = str(slide.get("spoken_lecture") or "").strip()
+    if not spoken:
+        return None
+    bullets = slide.get("bullets", [])
+    if not bullets:
+        return None
+
+    pruned = prune_redundant_slide_reading(slide)
+    if not pruned.strip():
+        s_num = slide.get("slide_number")
+        return {
+            "slide_number": s_num,
+            "type": "REDUNDANT_SLIDE_SPOKEN_OVERLAP",
+            "severity": "WARNING",
+            "message": (
+                f"Slide {s_num}: spoken_lecture redundantly repeats slide bullets "
+                f"without novel clinical commentary, pearls, or diagnostic facts. "
+                f"Apply Silent Suppression ('spoken_lecture': \"\") or keep only unique off-slide clinical pearls."
+            ),
+            "remediation_action": "Omit redundant paraphrasing of slide bullets and set spoken_lecture to empty string or preserve only off-slide pearls."
+        }
+    return None
+
 def evaluate_slide_level_grounding(translated_slides: list, transcript_chunks: list) -> tuple[list[dict], dict]:
     """
     Spatio-Temporal Grounding Engine:
@@ -391,6 +425,9 @@ def evaluate_slide_level_grounding(translated_slides: list, transcript_chunks: l
     for s in translated_slides:
         if not isinstance(s, dict):
             continue
+        red_issue = check_redundant_slide_spoken_overlap(s)
+        if red_issue:
+            issues.append(red_issue)
         num = s.get("slide_number", 0)
         is_skipped = bool(s.get("is_skipped") or s.get("unvoiced") or s.get("skipped_by_professor"))
         is_ceremonial = bool(s.get("is_ceremonial"))

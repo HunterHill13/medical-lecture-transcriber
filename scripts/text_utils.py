@@ -2039,20 +2039,34 @@ def prune_redundant_slide_reading(slide_obj: dict, raw_slide: Optional[dict] = N
     if is_visual_slide and not slide_obj.get("bullets"):
         return spoken
 
-    slide_parts = [slide_obj.get("title", ""), slide_obj.get("title_fa", "")]
+    slide_bullets = []
     for b in slide_obj.get("bullets", []):
-        slide_parts.append(str(b))
+        if isinstance(b, dict):
+            slide_bullets.append((b.get("lead", ""), b.get("text", "")))
+        elif isinstance(b, str):
+            b_lead, b_text = split_structured_lead(b)
+            slide_bullets.append((b_lead, b_text))
+
+    raw = raw_slide or slide_obj.get("raw_slide")
+    if isinstance(raw, dict):
+        for b in raw.get("bullets", []):
+            if isinstance(b, dict):
+                slide_bullets.append((b.get("lead", ""), b.get("text", "")))
+            elif isinstance(b, str):
+                b_lead, b_text = split_structured_lead(b)
+                slide_bullets.append((b_lead, b_text))
+
+    slide_parts = [slide_obj.get("title", ""), slide_obj.get("title_fa", "")]
+    for l, t in slide_bullets:
+        slide_parts.append(f"{l} {t}")
     for t_row in slide_obj.get("table_data", []):
         if isinstance(t_row, list):
             slide_parts.extend(str(c) for c in t_row)
         elif isinstance(t_row, dict):
             slide_parts.extend(str(v) for v in t_row.values())
 
-    raw = raw_slide or slide_obj.get("raw_slide")
     if isinstance(raw, dict):
         slide_parts.append(raw.get("title", ""))
-        for b in raw.get("bullets", []):
-            slide_parts.append(str(b))
         for t_row in raw.get("table_data", []):
             if isinstance(t_row, list):
                 slide_parts.extend(str(c) for c in t_row)
@@ -2098,19 +2112,115 @@ def prune_redundant_slide_reading(slide_obj: dict, raw_slide: Optional[dict] = N
                 return True
         return False
 
-    pearl_markers = (
-        "🚨", "⚠️", "💡", "📌", "🔬", "نکته بالینی", "کیس بالینی", "هشدار اورژانس",
-        "نکته امتحانی", "مکانیسم پاتوفیزیولوژی", "نکته کلیدی", "توجه بالینی"
+    GENUINE_PEARL_MARKERS = (
+        "🚨", "⚠️", "کیس بالینی", "هشدار اورژانس", "نکته امتحانی", "نکته بالینی",
+        "نکته تشخیصی", "نکته کلیدی", "مکانیسم پاتوفیزیولوژی"
     )
 
+    DIAGNOSTIC_OR_DRUG_PATTERNS = [
+        r"\bMBS\b", r"\bPPI\b", r"\bEGD\b", r"\bCT\b", r"\bMRI\b", r"\bCXR\b",
+        r"\bHBsAg\b", r"\bAnti-HBc\b", r"\bHBeAg\b", r"\bHBV\b", r"\bHCV\b",
+        r"گراند گلاس", r"گراندگلاس", r"هپاتوسیت", r"سیتوپلاسم",
+        r"ویدئوفلوروسکوپی", r"باریم", r"مانومتری", r"اندوسکوپی", r"آندوسکوپی",
+        r"بیوپسی", r"سیتولوژی", r"سونوگرافی", r"دارو", r"دوز", r"میلی‌گرم", r"میلی گرم",
+        r"جراحی", r"درمان خط", r"خط اول", r"پروتکل", r"الگوریتم", r"غربالگری", r"پروفیلاکسی"
+    ]
+
+    GENERIC_PARAPHRASE_TOKENS = {
+        normalize_for_matching(w) for w in [
+            "اطلاق", "می‌شود", "می‌گردد", "می‌یابد", "تظاهر", "پیدا", "می‌کند", "است",
+            "مرحله", "فاز", "محدود", "منحصراً", "آغاز", "اداره", "انتقال", "شدید",
+            "علت", "ناشی", "ریشه", "دنبال", "تجربه", "پیشین", "نظیر", "مهم", "شامل",
+            "عبارتند", "عبارت", "مربوط", "داشته", "باشد", "باشند", "گردند", "شوند",
+            "فراهم", "می‌سازد", "سازد", "مانع", "برگشت", "ورود", "جلوگیری", "امکان",
+            "محتویات", "کاملاً", "بازتابی", "بخش", "قسمت", "عنوان", "تعریف",
+            "حالت", "معمولا", "معمولاً", "ناتوان", "لقمه", "غذا", "کنترل", "عبور",
+            "قوس", "قوس‌ها", "قوس‌های", "کامی", "قدامی", "محض", "فازها", "فازهای",
+            "درگیر", "ویژگی", "بارز"
+        ]
+    }
+
+    def has_novel_clinical_entity(text: str, sl_text: str) -> bool:
+        norm_sl = normalize_for_matching(sl_text)
+        for pat in DIAGNOSTIC_OR_DRUG_PATTERNS:
+            match = re.search(pat, text, re.IGNORECASE)
+            if match:
+                matched_term = normalize_for_matching(match.group(0))
+                if matched_term not in norm_sl:
+                    return True
+        return False
+
+    def clean_lead_anchor(lead_str: str) -> str:
+        cleaned = re.sub(r"^[۰-۹0-9\.\-\s•\*\#\(\)]+", "", lead_str or "")
+        cleaned = re.sub(r"[\:\：\-\–\—\(\)]+$", "", cleaned)
+        return normalize_for_matching(cleaned).strip()
+
+    # 1. Whole-slide paraphrase check (Silent Suppression)
+    if slide_bullets:
+        has_pearl = any(m in spoken for m in GENUINE_PEARL_MARKERS)
+        sp_facts = extract_clinical_facts(spoken)
+        sp_numbers = set().union(
+            sp_facts.get("numbers", set()),
+            sp_facts.get("percentages", set()),
+            sp_facts.get("dosages", set()),
+            sp_facts.get("ranges", set()),
+            sp_facts.get("lab_values", set()),
+        )
+        has_novel_fact = bool(sp_numbers - slide_numbers) or has_novel_clinical_entity(spoken, slide_text)
+
+        if not has_pearl and not has_novel_fact:
+            bullet_concepts = []
+            for b_lead, b_text in slide_bullets:
+                toks = {normalize_for_matching(t) for t in extract_substantive_tokens(b_lead + " " + b_text)
+                        if len(t) > 2 and t.lower() not in ("phase", "oral", "pharyngeal", "esophageal", "مرحله", "فاز", "مراحل")}
+                if toks:
+                    bullet_concepts.append(toks)
+
+            spoken_norm = normalize_for_matching(spoken)
+            covered_bullets = sum(1 for b_c in bullet_concepts if any(c in spoken_norm for c in b_c))
+            if bullet_concepts and (covered_bullets == len(bullet_concepts) or (covered_bullets / len(bullet_concepts) >= 0.70)):
+                sp_toks = {normalize_for_matching(t) for t in extract_substantive_tokens(spoken)}
+                uncovered = {t for t in sp_toks if t not in GENERIC_PARAPHRASE_TOKENS and not any(t in st or st in t for st in normalize_for_matching(slide_text).split())}
+                if len(uncovered) <= 2:
+                    return ""
+
+    # 2. Block/line level pruning
     lines = [l.strip() for l in spoken.splitlines() if l.strip()]
     kept_lines = []
 
     for line in lines:
-        has_marker = any(m in line for m in pearl_markers)
-        lead, body = split_structured_lead(line)
-        target_text = body if lead else line
+        has_marker = any(m in line for m in GENUINE_PEARL_MARKERS)
+        ln_facts = extract_clinical_facts(line)
+        ln_numbers = set().union(
+            ln_facts.get("numbers", set()),
+            ln_facts.get("percentages", set()),
+            ln_facts.get("dosages", set()),
+            ln_facts.get("ranges", set()),
+            ln_facts.get("lab_values", set()),
+        )
+        novel_numbers = ln_numbers - slide_numbers
+        has_entity = has_novel_clinical_entity(line, slide_text)
 
+        lead, body = split_structured_lead(line)
+
+        # Check lead anchor match against slide bullet leads
+        if lead and not has_marker and not novel_numbers and not has_entity:
+            norm_lead = clean_lead_anchor(lead)
+            matched_lead = False
+            for b_lead, b_text in slide_bullets:
+                norm_b_lead = clean_lead_anchor(b_lead)
+                lead_tokens = set(norm_lead.split())
+                b_lead_tokens = set(norm_b_lead.split())
+                common_lead = lead_tokens & b_lead_tokens
+                if norm_lead in norm_b_lead or norm_b_lead in norm_lead or (len(common_lead) >= 1 and any(len(t) > 2 for t in common_lead)):
+                    matched_lead = True
+                    break
+            if matched_lead:
+                # Redundant bullet paraphrase - omit!
+                continue
+
+        # Sentence-level check for lines without leads or non-matching leads
+        target_text = body if lead else line
         sentences = [s.strip() for s in re.split(r'(?<!\d)[.!?؛\?](?!\d)\s*', target_text) if s.strip()]
         if not sentences:
             sentences = [target_text]
@@ -2126,19 +2236,16 @@ def prune_redundant_slide_reading(slide_obj: dict, raw_slide: Optional[dict] = N
                 sent_facts.get("ranges", set()),
                 sent_facts.get("lab_values", set()),
             )
+            s_novel_numbers = sent_numbers - slide_numbers
+            s_has_entity = has_novel_clinical_entity(sent, slide_text)
 
-            novel_numbers = sent_numbers - slide_numbers
-            covered_toks = {t for t in sent_toks if is_token_covered(t)}
-            novel_toks = {t for t in (sent_toks - covered_toks) if t not in AUX_VERB_STEMS}
-
-            if len(sent_toks) == 0 and not has_marker and not novel_numbers:
-                continue
-
-            overlap_ratio = (len(covered_toks) / len(sent_toks)) if sent_toks else 0.0
-
-            if not has_marker and overlap_ratio >= 0.70 and not novel_numbers and len(novel_toks) <= 1:
-                # Redundant slide reading sentence - prune!
-                continue
+            if not has_marker and not s_novel_numbers and not s_has_entity:
+                covered_toks = {t for t in sent_toks if is_token_covered(t)}
+                novel_toks = {t for t in (sent_toks - covered_toks) if normalize_for_matching(t) not in GENERIC_PARAPHRASE_TOKENS}
+                if len(sent_toks) > 0 and len(covered_toks) / len(sent_toks) >= 0.50 and len(novel_toks) <= 1:
+                    continue
+                if len(novel_toks) == 0 and len(covered_toks) >= 2:
+                    continue
 
             kept_sentences.append(sent)
 

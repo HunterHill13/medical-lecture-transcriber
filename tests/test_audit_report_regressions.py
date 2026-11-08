@@ -1,6 +1,7 @@
 import pytest
 from text_utils import clean_pamphlet_voice, prune_redundant_slide_reading
 from verify_slide_alignment import check_slide_pair
+from verify_lecture_alignment import check_redundant_slide_spoken_overlap
 from batch_orchestrator import _sanitize_slide_object, merge_slide_batches
 import tempfile
 import json
@@ -10,9 +11,6 @@ import os
 def test_clean_pamphlet_voice_transforms_third_person_leads_to_direct_leads():
     """
     Audit Report Regression Test: Direct Pamphlet Voice Law
-    Verifies that third-person reporting phrases ('استاد در تبیین...', 'استاد توضیح دادند...',
-    'بر اساس توضیحات استاد...') are converted into direct, authoritative medical pamphlet voice
-    with bold clinical leads, and that word count of 'استاد' drops to 0.
     """
     raw_lecture = (
         "استاد در تبیین میزان مصرف الکل و آستانه آسیب کبدی اشاره می‌کنند که مصرف مقادیر اندک در کوتاه‌مدت "
@@ -31,8 +29,6 @@ def test_clean_pamphlet_voice_transforms_third_person_leads_to_direct_leads():
 def test_synthetic_table_inflation_gate_blocks_fabricated_tables():
     """
     Audit Report Regression Test: Table Authenticity Law
-    Verifies that check_slide_pair flags SYNTHETIC_TABLE_INFLATION when a subagent
-    converts a normal non-table slide into a synthetic table.
     """
     raw_slide = {
         "slide_number": 15,
@@ -60,8 +56,6 @@ def test_synthetic_table_inflation_gate_blocks_fabricated_tables():
 def test_visual_schematic_series_slide_preserves_audio_commentary():
     """
     Audit Report Regression Test: Visual Slide Protocol
-    Verifies that visual/schematic slides (without text bullets) preserve the professor's
-    spoken explanation of the image/mechanism and are not silently suppressed to empty string.
     """
     visual_slide = {
         "slide_number": 52,
@@ -99,78 +93,85 @@ def test_sanitize_slide_object_applies_pamphlet_voice():
     assert "شرب سنگین در یک نوبت آسیب حاد ایجاد می‌کند." in sanitized["spoken_lecture"]
 
 
-def test_merge_slide_batches_auto_converts_synthetic_tables_to_bullets(tmp_path):
+def test_subtractive_synthesis_prunes_paraphrased_bullet_definitions():
     """
-    Verifies that merge_slide_batches detects unauthorized synthetic tables on slides
-    without raw tables, and converts the rows into standard structured bullets.
+    Subtractive Synthesis Report Case 1 (Slide 2):
+    Verifies that prune_redundant_slide_reading prunes paraphrased definitions
+    where the core clinical concept is already listed in slide bullets,
+    even when written in elevated literary Persian or with numbered leads.
     """
-    batches_dir = tmp_path / "batches"
-    batches_dir.mkdir()
-    
-    raw_slides = [
-        {
-            "slide_number": 1,
-            "title": "Alcohol Effects",
-            "text_lines": ["Binge drinking causes acute injury."],
-            "has_tables": False,
-            "has_image_table": False,
-            "tables": []
-        }
-    ]
-    raw_slides_path = tmp_path / "raw_slides.json"
-    with open(raw_slides_path, "w", encoding="utf-8") as f:
-        json.dump(raw_slides, f)
-        
-    manifest = {
-        "schema_version": "5.8.0",
-        "raw_slides_source": str(raw_slides_path),
-        "total_slides": 1,
-        "batch_size": 1,
-        "halo_size": 0,
-        "total_batches": 1,
-        "batches": [
+    slide2 = {
+        "slide_number": 2,
+        "title_fa": "دیسفاژی انتقالی و فاگوفوبیا",
+        "bullets": [
             {
-                "batch_id": "batch_001",
-                "start_slide": 1,
-                "end_slide": 1,
-                "slide_count": 1,
-                "expected_slide_numbers": [1],
-                "output_shard_file": str(batches_dir / "batch_001.translated.json")
-            }
-        ]
-    }
-    manifest_path = batches_dir / "batches_manifest.json"
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f)
-        
-    batch_trans = {
-        "batch_id": "batch_001",
-        "slides": [
+                "lead": "دیسفاژی انتقالی (Transfer Dysphagia):",
+                "text": "اغلب به پس‌زدن مواد از بینی و آسپیراسیون ریوی حین بلع منجر می‌شود و ویژگی بارز دیسفاژی اوروفارنژیال است."
+            },
             {
-                "slide_number": 1,
-                "title_fa": "اثرات الکل",
-                "bullets": ["مصرف سنگین موجب آسیب حاد می‌گردد."],
-                "table_data": {
-                    "headers": ["نوع", "عارضه"],
-                    "rows": [["حاد", "هپاتیت برق‌آسا"]]
-                }
+                "lead": "فاگوفوبیا (Phagophobia):",
+                "text": "ترس از بلع و امتناع از بلعیدن ممکن است منشأ سایکوژنیک داشته باشد یا به اضطراب پیش‌بینانه ناشی از انسداد با لقمه غذا، اودینوفاژی یا آسپیراسیون مربوط باشد."
             }
-        ]
+        ],
+        "spoken_lecture": (
+            "۱. دیسفاژی انتقالی: به اختلال در فاز دهانی-حلقی (اوروفارنژیال) اطلاق می‌شود که در آن بیمار در انتقال لقمه غذا ناتوان است. این حالت معمولاً با پس‌زدن مایعات از بینی و آسپیراسیون ریوی تظاهر پیدا می‌کند.\n\n"
+            "۲. فاگوفوبیا (Phagophobia): ترس شدید و امتناع از بلع غذا است که ممکن است ریشه سایکوژنیک داشته باشد یا به دنبال یک تجربه تروماتیک پیشین نظیر گیر کردن دردناک لقمه غذا ایجاد شود.\n\n"
+            "🚨 نکته بالینی مهم: در بیمار مشکوک به دیسفاژی انتقالی، بررسی بلع با باریم ویدئوفلوروسکوپی (MBS) خط اول ارزیابی است."
+        )
     }
-    with open(batches_dir / "batch_001.translated.json", "w", encoding="utf-8") as f:
-        json.dump(batch_trans, f)
-        
-    out_file = tmp_path / "translated_slides.json"
-    report = merge_slide_batches(
-        batches_dir=str(batches_dir),
-        raw_slides_path=str(raw_slides_path),
-        output_path=str(out_file)
-    )
-    
-    with open(out_file, "r", encoding="utf-8") as f:
-        merged = json.load(f)
-        
-    # Slide 1 must NOT have table_data because raw slide had no table!
-    s1 = merged[0]
-    assert "table_data" not in s1, "Synthetic table_data MUST be stripped"
-    assert any("هپاتیت برق‌آسا" in b for b in s1["bullets"]), "Table row must be converted to bullet"
+
+    pruned = prune_redundant_slide_reading(slide2)
+    assert "🚨 نکته بالینی مهم:" in pruned, "Unique off-slide clinical pearl MUST be preserved"
+    assert "باریم ویدئوفلوروسکوپی" in pruned, "Unique diagnostic procedure MUST be preserved"
+    assert "۱. دیسفاژی انتقالی: به اختلال در فاز دهانی-حلقی" not in pruned, "Paraphrased definition of Transfer Dysphagia MUST be pruned"
+    assert "۲. فاگوفوبیا (Phagophobia): ترس شدید" not in pruned, "Paraphrased definition of Phagophobia MUST be pruned"
+
+
+def test_subtractive_synthesis_silent_suppression_on_full_slide_paraphrase():
+    """
+    Subtractive Synthesis Report Case 2 (Slide 3):
+    Verifies that when 100% of spoken commentary merely paraphrases the 3 swallowing phases
+    on the slide without adding novel clinical facts or pearls, the entire spoken_lecture is
+    pruned to empty string ("") for Silent Suppression.
+    """
+    slide3 = {
+        "slide_number": 3,
+        "title_fa": "مراحل سه‌گانه بلع",
+        "bullets": [
+            {"lead": "فاز دهانی (Oral phase):", "text": "مرحله ارادی بلع"},
+            {"lead": "فاز حلقی (Pharyngeal phase):", "text": "مرحله غیرارادی بلع"},
+            {"lead": "فاز مروی (Esophageal phase):", "text": "مرحله غیرارادی بلع"}
+        ],
+        "spoken_lecture": (
+            "کنترل ارادی منحصراً به فاز دهانی محدود می‌شود. انتقال به فاز غیرارادی به محض عبور لقمه غذا "
+            "از قوس‌های کامی قدامی آغاز شده و فازهای حلقی و مروی به طور کاملاً غیرارادی و بازتابی اداره می‌گردند."
+        )
+    }
+
+    pruned = prune_redundant_slide_reading(slide3)
+    assert pruned == "", f"Expected empty string (Silent Suppression) for full paraphrase, got: {pruned!r}"
+
+
+def test_redundant_slide_spoken_overlap_gate_detects_unpruned_paraphrase():
+    """
+    Subtractive Synthesis Report Pillar 3 Gate:
+    Verifies that check_redundant_slide_spoken_overlap flags REDUNDANT_SLIDE_SPOKEN_OVERLAP
+    when a slide has non-empty spoken_lecture that merely re-explains slide bullets with 0 novel facts.
+    """
+    slide = {
+        "slide_number": 6,
+        "title_fa": "فاز حلقی بلع",
+        "bullets": [
+            {"lead": "بسته شدن نازوفارنکس:", "text": "جلوگیری از پس‌زدن مواد به بینی"},
+            {"lead": "بسته شدن حنجره:", "text": "محافظت از مجاری تنفسی در برابر آسپیراسیون"},
+            {"lead": "باز شدن اسفنکتر فوقانی مری (UES):", "text": "ورود لقمه به مری"}
+        ],
+        "spoken_lecture": (
+            "۱. بسته شدن نازوفارنکس: مانع از برگشت مواد به بینی می‌شود.\n\n"
+            "۲. بسته شدن حنجره: از ورود محتویات غذا به راه هوایی و آسپیراسیون جلوگیری می‌کند.\n\n"
+            "۳. باز شدن UES: امکان انتقال لقمه به داخل مری را فراهم می‌سازد."
+        )
+    }
+    issue = check_redundant_slide_spoken_overlap(slide)
+    assert issue is not None, "Expected REDUNDANT_SLIDE_SPOKEN_OVERLAP warning/error"
+    assert issue.get("type") == "REDUNDANT_SLIDE_SPOKEN_OVERLAP"

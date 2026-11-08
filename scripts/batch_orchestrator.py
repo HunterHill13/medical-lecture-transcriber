@@ -360,9 +360,11 @@ def partition_slides(
                 ),
                 "rule_11_subtractive_spoken_lecture_and_silent_suppression": (
                     "In Track 1 ('spoken_lecture'), enforce strict SUBTRACTIVE SYNTHESIS against slide content (Track 2): "
-                    "Compare the audio transcript with the slide bullets and tables. If the professor merely reads the slide bullets, definitions, or table rows aloud without adding new clinical commentary, strictly OMIT that redundant text from 'spoken_lecture'! "
-                    "Synthesize ONLY the professor's unique verbal commentary: clinical pearls, pathophysiological reasoning, emergency warnings (🚨), clinical cases, caveats, and exam tips. Each distinct point or pearl should have a clear structured lead-in. "
-                    "If the professor merely read the slide and added no extra explanation, set 'spoken_lecture': \"\" (empty string) for silent suppression. Track 1 is rendered per-slide directly beneath each slide box, and slides with empty 'spoken_lecture' will be cleanly suppressed without clutter."
+                    "CRITICAL SUBTRACTIVE LAW: Do NOT paraphrase, summarize, or re-explain the slide bullets in 'spoken_lecture'! "
+                    "If a concept (e.g. definitions, anatomy, classification phases, or mechanisms) is already listed in Track 2 bullets, repeating it in Track 1—even with elevated literary Persian—is a STRICT VIOLATION that triggers the REDUNDANT_SLIDE_SPOKEN_OVERLAP gate. "
+                    "Synthesize ONLY the professor's unique verbal commentary: off-slide clinical pearls, verbal caveats, emergency warnings (🚨), clinical cases, drug dosages, and exam tips. Each distinct point or pearl should have a clear structured lead-in. "
+                    "If the professor merely read or paraphrased the slide and added no unique off-slide clinical pearls, set 'spoken_lecture': \"\" (empty string) unconditionally for silent suppression. "
+                    "EGM COVERAGE INVARIANT: The EGM Coverage Gate evaluates UNION COVERAGE (Track 1 ∪ Track 2). When a fact is present on the slide bullets, it is already fully credited! You will NEVER be penalized for omitting slide-reading or slide paraphrases from Track 1."
                 ),
                 "rule_12_strict_audio_grounding_zero_hallucination": (
                     "STRICT AUDIO GROUNDING INVARIANT (قانون طلایی تطبیق صوت): Your ONLY source for Track 1 ('spoken_lecture') is the authentic audio transcript files in 'transcripts/'. "
